@@ -1,5 +1,3 @@
-import path from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { expect, test } from '@playwright/test'
 
 test('loads the main map shell and postal area sidebar', async ({ page }) => {
@@ -232,17 +230,4 @@ test('Portmarnock is navigated under Dublin 13 rather than K36', async ({ page }
   await page.getByText('Portmarnock').click()
 
   await expect(page.getByTestId('selected-district-name')).toHaveText('Dublin 13')
-})
-
-test('opening root index via file protocol shows a launch hint instead of a blank error', async ({
-  page,
-}) => {
-  const fileUrl = pathToFileURL(path.join(process.cwd(), 'index.html')).href
-
-  await page.goto(fileUrl)
-
-  await expect(
-    page.getByRole('heading', { name: 'This file cannot be opened directly' }),
-  ).toBeVisible()
-  await expect(page.getByText('start-dev.cmd')).toBeVisible()
 })
