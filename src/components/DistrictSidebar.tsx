@@ -13,7 +13,10 @@ import type {
   DistrictWithSubareas,
 } from '../types/districts'
 
+const GRADE_PRESET_VALUES: DistrictGrade[] = ['A', 'B']
+
 type DistrictSidebarProps = {
+  availableGrades: DistrictGrade[]
   districts: DistrictWithSubareas[]
   isOpen: boolean
   selectedDistrictId: string | null
@@ -31,6 +34,7 @@ type DistrictSidebarProps = {
 }
 
 export function DistrictSidebar({
+  availableGrades,
   districts,
   isOpen,
   selectedDistrictId,
@@ -124,13 +128,19 @@ export function DistrictSidebar({
   }
 
   const hasCustomFilters =
-    selectedGrades.length !== 4 || selectedLifestyleTags.length > 0 || sortMode !== 'postal'
+    selectedGrades.length !== availableGrades.length ||
+    selectedLifestyleTags.length > 0 ||
+    sortMode !== 'postal'
   const visiblePlacesCount = districts.reduce((sum, district) => sum + district.subareas.length, 0)
-  const isAllGradesSelected = selectedGrades.length === 4
+  const isAllGradesSelected = selectedGrades.length === availableGrades.length
+  const availableGradePresetValues = GRADE_PRESET_VALUES.filter((grade) =>
+    availableGrades.includes(grade),
+  )
   const isBPlusSelected =
-    selectedGrades.length === 2 &&
-    selectedGrades.includes('A') &&
-    selectedGrades.includes('B')
+    selectedGrades.length === availableGradePresetValues.length &&
+    availableGradePresetValues.every((grade) => selectedGrades.includes(grade))
+
+  const showBPlusPreset = availableGradePresetValues.length > 0
 
   return (
     <aside className="sidebar" data-open={isOpen} data-testid="sidebar">
@@ -181,19 +191,21 @@ export function DistrictSidebar({
               >
                 All
               </button>
-              <button
-                type="button"
-                className="filter-chip filter-chip--preset"
-                data-active={isBPlusSelected}
-                data-testid="grade-preset-b-plus"
-                onClick={() => onGradePresetSelect('b-plus')}
-              >
-                B+
-              </button>
+              {showBPlusPreset ? (
+                <button
+                  type="button"
+                  className="filter-chip filter-chip--preset"
+                  data-active={isBPlusSelected}
+                  data-testid="grade-preset-b-plus"
+                  onClick={() => onGradePresetSelect('b-plus')}
+                >
+                  B+
+                </button>
+              ) : null}
             </div>
 
             <div className="sidebar__chip-row">
-              {(['A', 'B', 'C', 'D'] as DistrictGrade[]).map((grade) => (
+              {availableGrades.map((grade) => (
                 <button
                   key={grade}
                   type="button"
@@ -201,7 +213,7 @@ export function DistrictSidebar({
                   data-active={selectedGrades.includes(grade)}
                   data-grade={grade.toLowerCase()}
                   data-testid={`grade-toggle-${grade.toLowerCase()}`}
-                    onClick={() => onGradeToggle(grade)}
+                  onClick={() => onGradeToggle(grade)}
                 >
                   {grade}
                 </button>

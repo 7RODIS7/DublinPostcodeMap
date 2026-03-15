@@ -1,5 +1,28 @@
 import { expect, test } from '@playwright/test'
 
+async function installClipboardStub(page: import('@playwright/test').Page) {
+  await page.addInitScript(() => {
+    let clipboardText = ''
+
+    Object.defineProperty(window, '__copiedText', {
+      configurable: true,
+      get: () => clipboardText,
+      set: (value) => {
+        clipboardText = String(value)
+      },
+    })
+
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          ;(window as typeof window & { __copiedText: string }).__copiedText = text
+        },
+      },
+    })
+  })
+}
+
 test('loads the main map shell and postal area sidebar', async ({ page }) => {
   await page.goto('/')
 
@@ -159,11 +182,16 @@ test('grade chips can narrow the list to grade A districts', async ({ page }) =>
 
   await page.getByTestId('grade-toggle-b').click()
   await page.getByTestId('grade-toggle-c').click()
-  await page.getByTestId('grade-toggle-d').click()
 
   await expect(page.getByTestId('district-button-dublin-4')).toBeVisible()
   await expect(page.getByTestId('district-button-dublin-24')).toHaveCount(0)
   await expect(page.getByTestId('district-button-routing-a94')).toBeVisible()
+})
+
+test('grade D filter is hidden when no districts currently use grade D', async ({ page }) => {
+  await page.goto('/')
+
+  await expect(page.getByTestId('grade-toggle-d')).toHaveCount(0)
 })
 
 test('grade presets can quickly switch to B+ filtering', async ({ page }) => {
@@ -221,6 +249,44 @@ test('subarea list exposes an explicit Google Maps action', async ({ page }) => 
     'data-tooltip',
     'Open in Google Maps',
   )
+})
+
+test('right click on the map opens a point menu with a Google Maps handoff', async ({ page }) => {
+  await installClipboardStub(page)
+  await page.goto('/')
+
+  await page.locator('.leaflet-container').click({
+    button: 'right',
+    position: { x: 420, y: 260 },
+  })
+
+  await expect(page.getByTestId('map-context-menu')).toBeVisible()
+  await page.getByTestId('map-context-copy').click()
+  await expect(page.getByTestId('map-context-copy')).toHaveText('Copied lat/lng')
+  await expect(page.getByTestId('map-context-google-maps')).toHaveAttribute(
+    'href',
+    /google\.com\/maps\/@\?api=1&map_action=map&center=.*&zoom=17/,
+  )
+})
+
+test('shared map view links restore the same area and can be copied again', async ({
+  page,
+}) => {
+  await installClipboardStub(page)
+  await page.goto('/?lat=53.30123&lng=-6.18876&z=13')
+
+  await page.locator('.leaflet-container').click({
+    button: 'right',
+    position: { x: 360, y: 260 },
+  })
+
+  await page.getByTestId('map-context-copy-view-link').click()
+  await expect(page.getByTestId('map-context-copy-view-link')).toHaveText('Copied view link')
+
+  const copiedText = await page.evaluate(() => (window as { __copiedText?: string }).__copiedText)
+  expect(copiedText).toContain('lat=53.30123')
+  expect(copiedText).toContain('lng=-6.18876')
+  expect(copiedText).toContain('z=13')
 })
 
 test('Portmarnock is navigated under Dublin 13 rather than K36', async ({ page }) => {

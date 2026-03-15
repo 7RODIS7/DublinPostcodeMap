@@ -4,7 +4,7 @@ function createGoogleMapsSearchUrl(query: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
 }
 
-function createGoogleMapsAreaUrl(
+export function createCoordinateGoogleMapsUrl(
   coordinates: [number, number],
   zoom: number,
 ): string {
@@ -32,7 +32,7 @@ export function createDistrictGoogleMapsUrl(
   },
 ): string {
   if (options?.center) {
-    return createGoogleMapsAreaUrl(options.center, options.zoom ?? 13)
+    return createCoordinateGoogleMapsUrl(options.center, options.zoom ?? 13)
   }
 
   const humanAlias = getHumanAlias(district)
@@ -53,7 +53,7 @@ export function createSubareaGoogleMapsUrl(
   district: Pick<DistrictMetadata, 'name' | 'shortName' | 'zoneType'>,
 ): string {
   if (subarea.coordinates) {
-    return createGoogleMapsAreaUrl(subarea.coordinates, subarea.zoom ?? 16)
+    return createCoordinateGoogleMapsUrl(subarea.coordinates, subarea.zoom ?? 16)
   }
 
   const query = [

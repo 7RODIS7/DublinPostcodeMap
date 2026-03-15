@@ -9,10 +9,13 @@ import {
   Pane,
   TileLayer,
   useMap,
+  useMapEvents,
 } from 'react-leaflet'
 import { districtMetaById } from '../lib/districtUtils'
 import { getDistrictColor } from '../lib/districtColors'
 import { getFeatureFocusBounds, getFeatureLabelPlacement } from '../lib/geo'
+import { createCoordinateGoogleMapsUrl } from '../lib/googleMaps'
+import { createSharedMapViewUrl, parseSharedMapView } from '../lib/mapViewUrl'
 import { clampRating, getOverallScore } from '../lib/districtRatings'
 import type {
   FocusRequest,
@@ -30,6 +33,7 @@ const DUBLIN_CENTER: L.LatLngTuple = [53.3498, -6.2603]
 const DUBLIN_ZOOM = 11
 const FULL_EXTENDED_LABEL_MIN_DISTANCE = 0.018
 const MICRO_EXTENDED_LABEL_MIN_DISTANCE = 0.006
+const CONTEXT_MENU_COPY_RESET_MS = 1400
 
 type DublinMapProps = {
   data: PostalFeatureCollection | null
@@ -48,6 +52,8 @@ type DublinMapProps = {
 
 type MapLabelVariant = 'compact' | 'micro' | 'extended'
 const transportLayerOrder: TransportLayerKey[] = ['rail', 'luas', 'metro', 'bus']
+const CONTEXT_MENU_WIDTH = 228
+const CONTEXT_MENU_HEIGHT = 206
 
 function buildDistrictStyle(
   districtId: string,
@@ -97,6 +103,42 @@ function MapInstanceBridge({ onReady }: { onReady: (map: L.Map) => void }) {
   useEffect(() => {
     onReady(map)
   }, [map, onReady])
+
+  return null
+}
+
+function MapContextMenuBridge({
+  onClose,
+  onOpen,
+}: {
+  onClose: () => void
+  onOpen: (payload: {
+    coordinates: [number, number]
+    containerPoint: { x: number; y: number }
+  }) => void
+}) {
+  useMapEvents({
+    click() {
+      onClose()
+    },
+    movestart() {
+      onClose()
+    },
+    zoomstart() {
+      onClose()
+    },
+    contextmenu(event) {
+      L.DomEvent.preventDefault(event.originalEvent)
+
+      onOpen({
+        coordinates: [event.latlng.lat, event.latlng.lng],
+        containerPoint: {
+          x: event.containerPoint.x,
+          y: event.containerPoint.y,
+        },
+      })
+    },
+  })
 
   return null
 }
@@ -219,8 +261,18 @@ export function DublinMap({
   onDistrictSelect,
 }: DublinMapProps) {
   const [map, setMap] = useState<L.Map | null>(null)
+  const [contextMenu, setContextMenu] = useState<{
+    coordinates: [number, number]
+    googleMapsUrl: string
+    left: number
+    top: number
+  } | null>(null)
+  const [contextMenuCopyState, setContextMenuCopyState] = useState<
+    'idle' | 'coordinates' | 'view-link' | 'error'
+  >('idle')
   const layerByDistrictId = useRef(new Map<string, Path>())
   const featureByDistrictId = useRef(new Map<string, PostalFeature>())
+  const hasAppliedSharedView = useRef(false)
   const interactionState = useRef({
     overlayOpacity,
     selectedDistrictId,
@@ -234,6 +286,37 @@ export function DublinMap({
     selectedDistrictId,
     visibleDistrictIds: visibleDistrictIdSet,
   }
+
+  useEffect(() => {
+    if (contextMenuCopyState === 'idle') {
+      return
+    }
+
+    const timerId = window.setTimeout(() => {
+      setContextMenuCopyState('idle')
+    }, CONTEXT_MENU_COPY_RESET_MS)
+
+    return () => {
+      window.clearTimeout(timerId)
+    }
+  }, [contextMenuCopyState])
+
+  useEffect(() => {
+    if (!map || hasAppliedSharedView.current) {
+      return
+    }
+
+    hasAppliedSharedView.current = true
+
+    const sharedView = parseSharedMapView(window.location.href)
+    if (!sharedView) {
+      return
+    }
+
+    map.setView(sharedView.center, sharedView.zoom, {
+      animate: false,
+    })
+  }, [map])
 
   useEffect(() => {
     layerByDistrictId.current.forEach((layer, districtId) => {
@@ -259,6 +342,9 @@ export function DublinMap({
     if (!map || !focusRequest) {
       return
     }
+
+    setContextMenu(null)
+    setContextMenuCopyState('idle')
 
     if (focusRequest.kind === 'reset') {
       map.flyTo(DUBLIN_CENTER, DUBLIN_ZOOM, {
@@ -328,6 +414,88 @@ export function DublinMap({
         onDistrictSelect(districtId)
       },
     })
+  }
+
+  function handleContextMenuOpen(payload: {
+    coordinates: [number, number]
+    containerPoint: { x: number; y: number }
+  }) {
+    const mapSize = map?.getSize()
+    const maxLeft = mapSize ? Math.max(12, mapSize.x - CONTEXT_MENU_WIDTH - 12) : payload.containerPoint.x
+    const maxTop = mapSize ? Math.max(12, mapSize.y - CONTEXT_MENU_HEIGHT - 12) : payload.containerPoint.y
+
+    setContextMenu({
+      coordinates: payload.coordinates,
+      googleMapsUrl: createCoordinateGoogleMapsUrl(payload.coordinates, 17),
+      left: Math.max(12, Math.min(payload.containerPoint.x, maxLeft)),
+      top: Math.max(12, Math.min(payload.containerPoint.y, maxTop)),
+    })
+    setContextMenuCopyState('idle')
+  }
+
+  function copyTextWithExecCommand(text: string): boolean {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.setAttribute('readonly', 'true')
+    textarea.style.position = 'fixed'
+    textarea.style.left = '-9999px'
+    textarea.style.top = '0'
+    document.body.appendChild(textarea)
+    textarea.focus()
+    textarea.select()
+
+    try {
+      return document.execCommand('copy')
+    } finally {
+      document.body.removeChild(textarea)
+    }
+  }
+
+  async function copyTextToClipboard(
+    text: string,
+    successState: 'coordinates' | 'view-link',
+  ) {
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(text)
+        } catch {
+          if (!copyTextWithExecCommand(text)) {
+            throw new Error('Clipboard write failed')
+          }
+        }
+      } else {
+        if (!copyTextWithExecCommand(text)) {
+          throw new Error('Clipboard fallback failed')
+        }
+      }
+
+      setContextMenuCopyState(successState)
+    } catch {
+      setContextMenuCopyState('error')
+    }
+  }
+
+  async function copyCoordinatesToClipboard(coordinates: [number, number]) {
+    const text = `${coordinates[0].toFixed(6)}, ${coordinates[1].toFixed(6)}`
+    await copyTextToClipboard(text, 'coordinates')
+  }
+
+  async function copyCurrentViewLink() {
+    if (!map) {
+      setContextMenuCopyState('error')
+      return
+    }
+
+    const center = map.getCenter()
+    const shareUrl = createSharedMapViewUrl(
+      window.location.href,
+      [center.lat, center.lng],
+      map.getZoom(),
+    )
+
+    await copyTextToClipboard(shareUrl, 'view-link')
   }
 
   const districtLabels = data
@@ -435,6 +603,10 @@ export function DublinMap({
         zoomControl={false}
       >
         <MapInstanceBridge onReady={setMap} />
+        <MapContextMenuBridge
+          onClose={() => setContextMenu(null)}
+          onOpen={handleContextMenuOpen}
+        />
 
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -519,6 +691,62 @@ export function DublinMap({
         <div className="map-status map-status--error">
           <strong>Map data unavailable</strong>
           <span>{loadError}</span>
+        </div>
+      ) : null}
+
+      {contextMenu ? (
+        <div
+          className="map-context-menu"
+          data-testid="map-context-menu"
+          style={{
+            left: `${contextMenu.left}px`,
+            top: `${contextMenu.top}px`,
+          }}
+        >
+          <div className="map-context-menu__coords">
+            <strong>Selected point</strong>
+            <span>
+              {contextMenu.coordinates[0].toFixed(5)}, {contextMenu.coordinates[1].toFixed(5)}
+            </span>
+          </div>
+
+          <div className="map-context-menu__actions">
+            <button
+              type="button"
+              className="map-context-menu__action map-context-menu__action--secondary"
+              data-testid="map-context-copy"
+              onClick={() => void copyCoordinatesToClipboard(contextMenu.coordinates)}
+            >
+              {contextMenuCopyState === 'coordinates'
+                ? 'Copied lat/lng'
+                : contextMenuCopyState === 'error'
+                  ? 'Copy failed'
+                  : 'Copy lat/lng'}
+            </button>
+
+            <button
+              type="button"
+              className="map-context-menu__action map-context-menu__action--secondary"
+              data-testid="map-context-copy-view-link"
+              onClick={() => void copyCurrentViewLink()}
+            >
+              {contextMenuCopyState === 'view-link'
+                ? 'Copied view link'
+                : contextMenuCopyState === 'error'
+                  ? 'Copy failed'
+                  : 'Copy current view link'}
+            </button>
+
+            <a
+              className="map-context-menu__action"
+              data-testid="map-context-google-maps"
+              href={contextMenu.googleMapsUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open point in Google Maps
+            </a>
+          </div>
         </div>
       ) : null}
     </div>

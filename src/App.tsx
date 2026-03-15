@@ -24,8 +24,7 @@ import type {
 } from './types/districts'
 
 const INITIAL_OPACITY = 0.22
-const DEFAULT_GRADE_SELECTION: DistrictGrade[] = ['A', 'B', 'C', 'D']
-const GRADE_PRESET_B_PLUS: DistrictGrade[] = ['A', 'B']
+const GRADE_ORDER: DistrictGrade[] = ['A', 'B', 'C', 'D']
 const DEFAULT_TRANSPORT_VISIBILITY: TransportLayerVisibility = {
   rail: true,
   luas: true,
@@ -48,6 +47,13 @@ const allDistricts: DistrictWithSubareas[] = districtMeta.map((district) => ({
   lifestyleTags: districtLifestyleTagsById[district.id] ?? [],
   subareas: districtSubareas.filter((subarea) => subarea.districtId === district.id),
 }))
+const AVAILABLE_GRADES: DistrictGrade[] = GRADE_ORDER.filter((grade) =>
+  allDistricts.some((district) => district.ratings.overall === grade),
+)
+const DEFAULT_GRADE_SELECTION: DistrictGrade[] = AVAILABLE_GRADES
+const GRADE_PRESET_B_PLUS: DistrictGrade[] = AVAILABLE_GRADES.filter(
+  (grade) => grade === 'A' || grade === 'B',
+)
 const allDistrictsById = Object.fromEntries(allDistricts.map((district) => [district.id, district]))
 const allowedLifestyleTags: DistrictLifestyleTag[] = [
   'family-friendly',
@@ -107,7 +113,7 @@ export default function App() {
       }
 
       const grades = parsed.filter((item): item is DistrictGrade =>
-        DEFAULT_GRADE_SELECTION.includes(item),
+        AVAILABLE_GRADES.includes(item),
       )
 
       return grades.length > 0 ? grades : DEFAULT_GRADE_SELECTION
@@ -328,7 +334,7 @@ export default function App() {
           ? current
           : current.filter((item) => item !== grade)
         : [...current, grade].sort((left, right) =>
-            DEFAULT_GRADE_SELECTION.indexOf(left) - DEFAULT_GRADE_SELECTION.indexOf(right),
+            GRADE_ORDER.indexOf(left) - GRADE_ORDER.indexOf(right),
           ),
     )
   }
@@ -400,6 +406,7 @@ export default function App() {
   return (
     <main className="app-shell" data-sidebar-open={isSidebarOpen} data-testid="app-shell">
       <DistrictSidebar
+        availableGrades={AVAILABLE_GRADES}
         districts={visibleDistricts}
         isOpen={isSidebarOpen}
         selectedDistrictId={selectedDistrictId}
