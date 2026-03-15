@@ -1,0 +1,42 @@
+{
+  "name": "dublin-postcode-map",
+  "description": "Interactive Dublin postal area map for comparing neighborhoods and sharing local references.",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "vite --open",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "fetch:districts": "node scripts/fetch-dublin-postal.js",
+    "fetch:transport": "node scripts/fetch-dublin-transport.js",
+    "fetch:green": "node scripts/fetch-dublin-green.js",
+    "validate:subareas": "node scripts/validate-subareas.js",
+    "validate:transport": "node scripts/validate-transport.js",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "polylabel": "^2.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-leaflet": "^5.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@tmcw/togeojson": "^7.1.2",
+    "@types/geojson": "^7946.0.16",
+    "@types/leaflet": "^1.9.21",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^5.1.0",
+    "@xmldom/xmldom": "^0.8.11",
+    "csv-parse": "^6.1.0",
+    "fflate": "^0.8.2",
+    "osmtogeojson": "^2.2.12",
+    "shpjs": "^6.2.0",
+    "typescript": "~5.9.3",
+    "vite": "^8.0.0"
+  }
+}

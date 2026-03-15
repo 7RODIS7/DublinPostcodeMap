@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Interactive Dublin postal districts map with adjustable overlay opacity and sidebar navigation."
+    />
+    <title>Dublin Postal Districts Map</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      const root = document.getElementById('root')
+      const openedFromFile = window.location.protocol === 'file:'
+
+      if (openedFromFile && root) {
+        root.innerHTML = `
+          <main style="min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(135deg,#f4efe5 0%,#dae7e3 52%,#c9dbd7 100%);font-family:Manrope,Segoe UI,sans-serif;color:#15232b;">
+            <section style="max-width:760px;padding:28px;border-radius:24px;background:rgba(255,251,246,.92);box-shadow:0 18px 45px rgba(29,49,58,.14);border:1px solid rgba(21,35,43,.12);">
+              <p style="margin:0 0 12px;font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#5c6970;">Local launch required</p>
+              <h1 style="margin:0 0 12px;font:700 clamp(32px,5vw,52px)/.95 'Source Serif 4',Georgia,serif;">This file cannot be opened directly</h1>
+              <p style="margin:0 0 10px;font-size:16px;line-height:1.6;color:#41515a;">This app is built with Vite and must run through a local HTTP server rather than <code>file://</code>. Otherwise the browser blocks module and map data loading.</p>
+              <p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:#41515a;">Use one of the options below from the project folder:</p>
+              <pre style="margin:0 0 14px;padding:16px;border-radius:16px;background:#18242b;color:#f8f6f1;overflow:auto;"><code>npm install
+npm run dev</code></pre>
+              <p style="margin:0 0 10px;font-size:16px;line-height:1.6;color:#41515a;">Or simply run <strong>start-dev.cmd</strong>.</p>
+              <p style="margin:0;font-size:14px;line-height:1.5;color:#5c6970;">After launch, open an address like <strong>http://localhost:5173</strong>.</p>
+            </section>
+          </main>
+        `
+      } else {
+        import('./src/main.tsx')
+      }
+    </script>
+  </body>
+</html>

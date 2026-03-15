@@ -1,0 +1,58 @@
+import type { DistrictLifestyleTag } from '../types/districts'
+
+export const lifestyleTagLabels: Record<DistrictLifestyleTag, string> = {
+  'family-friendly': 'Family',
+  quiet: 'Quiet',
+  walkable: 'Walkable',
+  'no-car-friendly': 'No car',
+  coastal: 'Coastal',
+  'village-feel': 'Village',
+  mixed: 'Address matters',
+}
+
+export const lifestyleTagDescriptions: Record<DistrictLifestyleTag, string> = {
+  'family-friendly': 'Good fit for family routines, schools and calmer residential life.',
+  quiet: 'Usually calmer and less hectic than the city core.',
+  walkable: 'Daily errands and local life work well on foot.',
+  'no-car-friendly': 'More realistic to live comfortably without depending on a car.',
+  coastal: 'Sea, strand or stronger coastal lifestyle access nearby.',
+  'village-feel': 'More local, village-like atmosphere than a generic suburban sprawl.',
+  mixed: 'Quality varies a lot by pocket, so the exact address matters more than the postcode average.',
+}
+
+export const districtLifestyleTagsById: Record<string, DistrictLifestyleTag[]> = {
+  'dublin-1': ['walkable', 'no-car-friendly', 'mixed'],
+  'dublin-2': ['walkable', 'no-car-friendly', 'mixed'],
+  'dublin-3': ['family-friendly', 'walkable', 'coastal'],
+  'dublin-4': ['family-friendly', 'walkable', 'no-car-friendly'],
+  'dublin-5': ['family-friendly', 'mixed'],
+  'dublin-6': ['family-friendly', 'walkable', 'village-feel'],
+  'dublin-6w': ['family-friendly', 'quiet', 'village-feel'],
+  'dublin-7': ['walkable', 'no-car-friendly', 'mixed'],
+  'dublin-8': ['walkable', 'no-car-friendly', 'mixed'],
+  'dublin-9': ['family-friendly', 'mixed'],
+  'dublin-10': ['mixed'],
+  'dublin-11': ['mixed'],
+  'dublin-12': ['family-friendly', 'mixed'],
+  'dublin-13': ['family-friendly', 'coastal'],
+  'dublin-14': ['family-friendly', 'quiet', 'village-feel'],
+  'dublin-15': ['family-friendly', 'mixed'],
+  'dublin-16': ['family-friendly', 'quiet'],
+  'dublin-17': ['mixed'],
+  'dublin-18': ['family-friendly', 'quiet'],
+  'dublin-20': ['family-friendly', 'village-feel'],
+  'dublin-22': ['mixed'],
+  'dublin-24': ['mixed'],
+  'routing-a94': ['family-friendly', 'coastal', 'quiet'],
+  'routing-a96': ['coastal', 'mixed'],
+  'routing-k32': ['coastal', 'quiet'],
+  'routing-k34': ['family-friendly', 'coastal', 'village-feel'],
+  'routing-k36': ['family-friendly', 'coastal', 'quiet'],
+  'routing-k45': ['quiet'],
+  'routing-k56': ['coastal', 'quiet'],
+  'routing-k67': ['family-friendly', 'mixed'],
+  'routing-k78': ['family-friendly', 'mixed'],
+  'routing-a41': ['quiet'],
+  'routing-a42': ['quiet'],
+  'routing-a45': ['quiet'],
+}
