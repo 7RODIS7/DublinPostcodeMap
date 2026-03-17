@@ -287,6 +287,16 @@ export function DublinMap({
     visibleDistrictIds: visibleDistrictIdSet,
   }
 
+  function bringSelectedLayerToFront() {
+    const activeDistrictId = interactionState.current.selectedDistrictId
+    if (!activeDistrictId) {
+      return
+    }
+
+    const activeLayer = layerByDistrictId.current.get(activeDistrictId)
+    activeLayer?.bringToFront()
+  }
+
   useEffect(() => {
     if (contextMenuCopyState === 'idle') {
       return
@@ -329,13 +339,7 @@ export function DublinMap({
         ),
       )
     })
-
-    if (!selectedDistrictId) {
-      return
-    }
-
-    const activeLayer = layerByDistrictId.current.get(selectedDistrictId)
-    activeLayer?.bringToFront()
+    bringSelectedLayerToFront()
   }, [overlayOpacity, selectedDistrictId, data, visibleDistrictIds])
 
   useEffect(() => {
@@ -399,6 +403,9 @@ export function DublinMap({
           buildHoverStyle(districtId, interactionState.current.overlayOpacity),
         )
         layer.bringToFront()
+        if (districtId !== interactionState.current.selectedDistrictId) {
+          bringSelectedLayerToFront()
+        }
       },
       mouseout: () => {
         layer.setStyle(
@@ -409,6 +416,7 @@ export function DublinMap({
             interactionState.current.visibleDistrictIds,
           ),
         )
+        bringSelectedLayerToFront()
       },
       click: () => {
         onDistrictSelect(districtId)

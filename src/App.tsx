@@ -5,6 +5,7 @@ import { MapControls } from './components/MapControls'
 import { districtMeta } from './data/districtMeta'
 import { districtLifestyleTagsById } from './data/districtTags'
 import { districtSubareas } from './data/subareas'
+import { createDistrictDaftRentLink } from './lib/daft'
 import { normalizePostalFeatureCollection } from './lib/districtUtils'
 import { estimateGoogleMapsZoom, getBoundsCenter, getFeatureFocusBounds } from './lib/geo'
 import { createDistrictGoogleMapsUrl } from './lib/googleMaps'
@@ -402,6 +403,9 @@ export default function App() {
           }
         : undefined)
     : null
+  const selectedDistrictDaftRentLink = selectedDistrict
+    ? createDistrictDaftRentLink(selectedDistrict)
+    : null
 
   return (
     <main className="app-shell" data-sidebar-open={isSidebarOpen} data-testid="app-shell">
@@ -437,6 +441,7 @@ export default function App() {
             onTransportToggle={handleTransportToggle}
             onToggleSidebar={() => setIsSidebarOpen((current) => !current)}
             selectedDistrict={selectedDistrict}
+            selectedDistrictDaftRentLink={selectedDistrictDaftRentLink}
             selectedDistrictGoogleMapsUrl={selectedDistrictGoogleMapsUrl}
             showDistrictLabels={showDistrictLabels}
             transportAvailable={Boolean(transportData?.features.length)}

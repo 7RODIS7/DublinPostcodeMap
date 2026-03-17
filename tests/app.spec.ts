@@ -139,6 +139,36 @@ test('selection popover includes a Google Maps link for the chosen area', async 
   )
 })
 
+test('selection popover includes a Daft rent link for a Dublin district', async ({ page }) => {
+  await page.goto('/')
+
+  await page.getByTestId('district-button-dublin-9').click()
+
+  await expect(page.getByTestId('selection-daft-rent')).toHaveAttribute(
+    'href',
+    'https://www.daft.ie/property-for-rent/dublin-9-dublin',
+  )
+  await expect(page.getByTestId('selection-daft-rent')).toHaveAttribute(
+    'data-tooltip',
+    'Open rent on Daft.ie',
+  )
+})
+
+test('selection popover maps routing keys to curated Daft rent areas', async ({ page }) => {
+  await page.goto('/')
+
+  await page.getByTestId('district-button-routing-a94').click()
+
+  await expect(page.getByTestId('selection-daft-rent')).toHaveAttribute(
+    'href',
+    'https://www.daft.ie/property-for-rent/blackrock-dublin',
+  )
+  await expect(page.getByTestId('selection-daft-rent')).toHaveAttribute(
+    'title',
+    'Open rent listings for Blackrock, Dublin on Daft.ie',
+  )
+})
+
 test('sidebar expansion stays navigation-only without duplicate summary text', async ({
   page,
 }) => {

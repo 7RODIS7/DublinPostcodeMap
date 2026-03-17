@@ -6,6 +6,7 @@ import {
   ratingMetricOrder,
 } from '../lib/districtRatings'
 import { lifestyleTagDescriptions, lifestyleTagLabels } from '../data/districtTags'
+import type { DistrictDaftRentLink } from '../lib/daft'
 import type {
   DistrictWithSubareas,
   MapLabelMode,
@@ -25,6 +26,7 @@ type MapControlsProps = {
   onTransportToggle: (layerKey: TransportLayerKey) => void
   onToggleSidebar: () => void
   selectedDistrict: DistrictWithSubareas | null
+  selectedDistrictDaftRentLink: DistrictDaftRentLink | null
   selectedDistrictGoogleMapsUrl: string | null
   showDistrictLabels: boolean
   transportAvailable: boolean
@@ -43,6 +45,7 @@ export function MapControls({
   onTransportToggle,
   onToggleSidebar,
   selectedDistrict,
+  selectedDistrictDaftRentLink,
   selectedDistrictGoogleMapsUrl,
   showDistrictLabels,
   transportAvailable,
@@ -110,6 +113,35 @@ export function MapControls({
               <div className="selection-card__topline">
                 <p className="map-toolbar__eyebrow">Selection</p>
                 <div className="selection-card__tools">
+                  {selectedDistrictDaftRentLink && selectedDistrict ? (
+                    <a
+                      className="selection-card__icon-button"
+                      data-testid="selection-daft-rent"
+                      data-tooltip="Open rent on Daft.ie"
+                      aria-label={`Open rent listings for ${selectedDistrictDaftRentLink.targetName} on Daft.ie`}
+                      href={selectedDistrictDaftRentLink.url}
+                      rel="noreferrer"
+                      target="_blank"
+                      title={`Open rent listings for ${selectedDistrictDaftRentLink.targetName} on Daft.ie`}
+                    >
+                      <svg viewBox="0 0 16 16" aria-hidden="true">
+                        <path
+                          d="M2.7 7.2 8 3l5.3 4.2v5.4a1 1 0 0 1-1 1h-2.4V9.4H6.1v4.2H3.7a1 1 0 0 1-1-1V7.2Z"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeLinejoin="round"
+                          strokeWidth="1.2"
+                        />
+                        <path
+                          d="M6.1 13.6V9.4h3.8v4.2"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeLinejoin="round"
+                          strokeWidth="1.2"
+                        />
+                      </svg>
+                    </a>
+                  ) : null}
                   {selectedDistrictGoogleMapsUrl && selectedDistrict ? (
                     <a
                       className="selection-card__icon-button"
