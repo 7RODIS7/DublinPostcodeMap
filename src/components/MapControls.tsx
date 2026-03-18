@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { DistrictMetricPills } from './DistrictMetricPills'
+import { formatCoordinates, parseCoordinateInput } from '../lib/coordinateSearch'
 import {
   ratingMetricDescriptions,
   ratingMetricLabels,
@@ -19,6 +20,10 @@ type MapControlsProps = {
   isSidebarOpen: boolean
   labelMode: MapLabelMode
   opacity: number
+  onCoordinateFocus: (payload: {
+    coordinates: [number, number]
+    zoom?: number
+  }) => void
   onLabelModeChange: (mode: MapLabelMode) => void
   onOpacityChange: (opacity: number) => void
   onResetView: () => void
@@ -38,6 +43,7 @@ export function MapControls({
   isSidebarOpen,
   labelMode,
   opacity,
+  onCoordinateFocus,
   onLabelModeChange,
   onOpacityChange,
   onResetView,
@@ -51,8 +57,12 @@ export function MapControls({
   transportAvailable,
   transportVisibility,
 }: MapControlsProps) {
-  const [openPanel, setOpenPanel] = useState<'selection' | 'settings' | null>(null)
+  const [openPanel, setOpenPanel] = useState<'selection' | 'settings' | 'coordinates' | null>(
+    null,
+  )
   const [isLegendOpen, setIsLegendOpen] = useState(false)
+  const [coordinateQuery, setCoordinateQuery] = useState('')
+  const [coordinateError, setCoordinateError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!selectedDistrict) {
@@ -61,6 +71,20 @@ export function MapControls({
 
     setOpenPanel('selection')
   }, [selectedDistrict])
+
+  function handleCoordinateSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const parsed = parseCoordinateInput(coordinateQuery)
+    if (!parsed) {
+      setCoordinateError('Enter `lat, lng` or paste a Google Maps URL with coordinates.')
+      return
+    }
+
+    setCoordinateError(null)
+    setCoordinateQuery(formatCoordinates(parsed.coordinates, 5))
+    onCoordinateFocus(parsed)
+  }
 
   return (
     <div className="map-toolbar">
@@ -93,6 +117,18 @@ export function MapControls({
               {selectedDistrict ? (
                 <span className="toolbar-button__badge">{selectedDistrict.shortName}</span>
               ) : null}
+            </button>
+
+            <button
+              type="button"
+              className="toolbar-button toolbar-button--dark"
+              data-active={openPanel === 'coordinates'}
+              data-testid="coordinates-toggle"
+              onClick={() =>
+                setOpenPanel((current) => (current === 'coordinates' ? null : 'coordinates'))
+              }
+            >
+              Coordinates
             </button>
 
             <button
@@ -266,6 +302,70 @@ export function MapControls({
                   </div>
                 </div>
               ) : null}
+            </section>
+          ) : null}
+
+          {openPanel === 'coordinates' ? (
+            <section
+              className="map-coordinate-search map-popover"
+              data-testid="coordinate-search-popover"
+            >
+              <div className="map-coordinate-search__header">
+                <div>
+                  <p className="map-toolbar__eyebrow">Jump to point</p>
+                  <h2>Coordinates</h2>
+                </div>
+                <button
+                  type="button"
+                  className="toolbar-button toolbar-button--soft"
+                  onClick={() => {
+                    setCoordinateError(null)
+                    setCoordinateQuery('')
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+
+              <form className="map-coordinate-search__form" onSubmit={handleCoordinateSubmit}>
+                <label className="map-coordinate-search__field" htmlFor="coordinate-search-input">
+                  <span>Paste `lat, lng` or a Google Maps URL</span>
+                  <input
+                    id="coordinate-search-input"
+                    data-testid="coordinate-search-input"
+                    placeholder="53.3498, -6.2603 or https://maps.google.com/..."
+                    type="text"
+                    value={coordinateQuery}
+                    onChange={(event) => {
+                      setCoordinateQuery(event.target.value)
+                      if (coordinateError) {
+                        setCoordinateError(null)
+                      }
+                    }}
+                  />
+                </label>
+
+                <p className="map-coordinate-search__hint">
+                  Works with plain coordinates and Google Maps links that contain the point.
+                </p>
+
+                {coordinateError ? (
+                  <p
+                    className="map-coordinate-search__error"
+                    data-testid="coordinate-search-error"
+                  >
+                    {coordinateError}
+                  </p>
+                ) : null}
+
+                <button
+                  type="submit"
+                  className="map-coordinate-search__submit"
+                  data-testid="coordinate-search-submit"
+                >
+                  Find place
+                </button>
+              </form>
             </section>
           ) : null}
 

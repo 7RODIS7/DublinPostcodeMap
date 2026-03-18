@@ -12,6 +12,7 @@ import {
   useMapEvents,
 } from 'react-leaflet'
 import { districtMetaById } from '../lib/districtUtils'
+import { formatCoordinates } from '../lib/coordinateSearch'
 import { getDistrictColor } from '../lib/districtColors'
 import { getFeatureFocusBounds, getFeatureLabelPlacement } from '../lib/geo'
 import { createCoordinateGoogleMapsUrl } from '../lib/googleMaps'
@@ -53,7 +54,7 @@ type DublinMapProps = {
 type MapLabelVariant = 'compact' | 'micro' | 'extended'
 const transportLayerOrder: TransportLayerKey[] = ['rail', 'luas', 'metro', 'bus']
 const CONTEXT_MENU_WIDTH = 228
-const CONTEXT_MENU_HEIGHT = 206
+const CONTEXT_MENU_HEIGHT = 194
 
 function buildDistrictStyle(
   districtId: string,
@@ -486,7 +487,7 @@ export function DublinMap({
   }
 
   async function copyCoordinatesToClipboard(coordinates: [number, number]) {
-    const text = `${coordinates[0].toFixed(6)}, ${coordinates[1].toFixed(6)}`
+    const text = formatCoordinates(coordinates, 6)
     await copyTextToClipboard(text, 'coordinates')
   }
 
@@ -674,16 +675,17 @@ export function DublinMap({
             ))
           : null}
 
-        {focusRequest?.kind === 'subarea' ? (
+        {focusRequest?.kind === 'subarea' || focusRequest?.kind === 'coordinates' ? (
           <CircleMarker
             center={focusRequest.coordinates}
             pathOptions={{
               color: '#18242b',
-              fillColor: '#f08a5d',
+              fillColor:
+                focusRequest.kind === 'coordinates' ? '#1d9c79' : '#f08a5d',
               fillOpacity: 0.95,
               weight: 2.5,
             }}
-            radius={8}
+            radius={focusRequest.kind === 'coordinates' ? 7 : 8}
           />
         ) : null}
       </MapContainer>
@@ -712,26 +714,21 @@ export function DublinMap({
           }}
         >
           <div className="map-context-menu__coords">
-            <strong>Selected point</strong>
-            <span>
-              {contextMenu.coordinates[0].toFixed(5)}, {contextMenu.coordinates[1].toFixed(5)}
-            </span>
-          </div>
-
-          <div className="map-context-menu__actions">
             <button
               type="button"
-              className="map-context-menu__action map-context-menu__action--secondary"
+              className="map-context-menu__coordinate-button"
+              aria-label="Copy coordinates"
+              data-copy-state={contextMenuCopyState}
               data-testid="map-context-copy"
               onClick={() => void copyCoordinatesToClipboard(contextMenu.coordinates)}
             >
-              {contextMenuCopyState === 'coordinates'
-                ? 'Copied lat/lng'
-                : contextMenuCopyState === 'error'
-                  ? 'Copy failed'
-                  : 'Copy lat/lng'}
+              <span className="map-context-menu__coordinate-value">
+                {formatCoordinates(contextMenu.coordinates, 5)}
+              </span>
             </button>
+          </div>
 
+          <div className="map-context-menu__actions">
             <button
               type="button"
               className="map-context-menu__action map-context-menu__action--secondary"

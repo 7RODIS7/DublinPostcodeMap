@@ -128,3 +128,9 @@ export type FocusRequest =
       zoom?: number
       nonce: number
     }
+  | {
+      kind: 'coordinates'
+      coordinates: [number, number]
+      zoom?: number
+      nonce: number
+    }

@@ -281,6 +281,28 @@ test('subarea list exposes an explicit Google Maps action', async ({ page }) => 
   )
 })
 
+test('coordinate search accepts plain lat/lng pairs and syncs selection', async ({ page }) => {
+  await page.goto('/')
+
+  await page.getByTestId('coordinates-toggle').click()
+  await page.getByTestId('coordinate-search-input').fill('53.2526, -6.1404')
+  await page.getByTestId('coordinate-search-submit').click()
+
+  await expect(page.getByTestId('selected-district-name')).toHaveText('Dublin 18')
+})
+
+test('coordinate search accepts Google Maps URLs with coordinates', async ({ page }) => {
+  await page.goto('/')
+
+  await page.getByTestId('coordinates-toggle').click()
+  await page
+    .getByTestId('coordinate-search-input')
+    .fill('https://www.google.com/maps/@53.2526,-6.1404,16z')
+  await page.getByTestId('coordinate-search-submit').click()
+
+  await expect(page.getByTestId('selected-district-name')).toHaveText('Dublin 18')
+})
+
 test('right click on the map opens a point menu with a Google Maps handoff', async ({ page }) => {
   await installClipboardStub(page)
   await page.goto('/')
@@ -292,7 +314,11 @@ test('right click on the map opens a point menu with a Google Maps handoff', asy
 
   await expect(page.getByTestId('map-context-menu')).toBeVisible()
   await page.getByTestId('map-context-copy').click()
-  await expect(page.getByTestId('map-context-copy')).toHaveText('Copied lat/lng')
+  await expect(page.getByTestId('map-context-copy')).toContainText(/^-?\d+\.\d{5}, -?\d+\.\d{5}$/)
+
+  const copiedText = await page.evaluate(() => (window as { __copiedText?: string }).__copiedText)
+  expect(copiedText).toMatch(/^-?\d+\.\d{6}, -?\d+\.\d{6}$/)
+
   await expect(page.getByTestId('map-context-google-maps')).toHaveAttribute(
     'href',
     /google\.com\/maps\/@\?api=1&map_action=map&center=.*&zoom=17/,

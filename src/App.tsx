@@ -7,7 +7,12 @@ import { districtLifestyleTagsById } from './data/districtTags'
 import { districtSubareas } from './data/subareas'
 import { createDistrictDaftRentLink } from './lib/daft'
 import { normalizePostalFeatureCollection } from './lib/districtUtils'
-import { estimateGoogleMapsZoom, getBoundsCenter, getFeatureFocusBounds } from './lib/geo'
+import {
+  estimateGoogleMapsZoom,
+  findFeatureAtPoint,
+  getBoundsCenter,
+  getFeatureFocusBounds,
+} from './lib/geo'
 import { createDistrictGoogleMapsUrl } from './lib/googleMaps'
 import { matchesSelectedGrades, sortDistricts } from './lib/districtRatings'
 import type {
@@ -328,6 +333,23 @@ export default function App() {
     }))
   }
 
+  function handleCoordinateFocus(payload: {
+    coordinates: [number, number]
+    zoom?: number
+  }) {
+    const matchingDistrictId = postalData
+      ? findFeatureAtPoint(postalData.features, payload.coordinates)?.properties.id ?? null
+      : null
+
+    setSelectedDistrictId(matchingDistrictId)
+    setFocusRequest((previous): FocusRequest => ({
+      kind: 'coordinates',
+      coordinates: payload.coordinates,
+      zoom: payload.zoom ?? 16,
+      nonce: (previous?.nonce ?? 0) + 1,
+    }))
+  }
+
   function handleGradeToggle(grade: DistrictGrade) {
     setSelectedGrades((current) =>
       current.includes(grade)
@@ -433,6 +455,7 @@ export default function App() {
             districtCount={visibleDistricts.length}
             isSidebarOpen={isSidebarOpen}
             labelMode={districtLabelMode}
+            onCoordinateFocus={handleCoordinateFocus}
             onResetView={handleResetView}
             opacity={overlayOpacity}
             onLabelModeChange={setDistrictLabelMode}
