@@ -15,6 +15,7 @@ import {
 } from './lib/geo'
 import { createDistrictGoogleMapsUrl } from './lib/googleMaps'
 import { matchesSelectedGrades, sortDistricts } from './lib/districtRatings'
+import { isUserPointIconKey } from './lib/userPoints'
 import type {
   DistrictGrade,
   DistrictLifestyleTag,
@@ -27,6 +28,8 @@ import type {
   TransportFeatureCollection,
   TransportLayerKey,
   TransportLayerVisibility,
+  UserPointIconKey,
+  UserSavedPoint,
 } from './types/districts'
 
 const INITIAL_OPACITY = 0.22
@@ -46,6 +49,7 @@ const STORAGE_KEYS = {
   districtLabelMode: 'dublin-map:district-label-mode',
   overlayOpacity: 'dublin-map:overlay-opacity',
   transportVisibility: 'dublin-map:transport-visibility',
+  savedPoints: 'dublin-map:user-saved-points',
 } as const
 
 const allDistricts: DistrictWithSubareas[] = districtMeta.map((district) => ({
@@ -110,6 +114,7 @@ export default function App() {
   const [postalData, setPostalData] = useState<PostalFeatureCollection | null>(null)
   const [transportData, setTransportData] = useState<TransportFeatureCollection | null>(null)
   const [selectedDistrictId, setSelectedDistrictId] = useState<string | null>(null)
+  const [selectedSavedPointId, setSelectedSavedPointId] = useState<string | null>(null)
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null)
   const [selectedGrades, setSelectedGrades] = useState<DistrictGrade[]>(() =>
     readStoredValue(STORAGE_KEYS.grades, DEFAULT_GRADE_SELECTION, (raw) => {
@@ -177,6 +182,43 @@ export default function App() {
         bus: parsed?.bus === true,
         metro: parsed?.metro === true,
       }
+    }),
+  )
+  const [savedPoints, setSavedPoints] = useState<UserSavedPoint[]>(() =>
+    readStoredValue(STORAGE_KEYS.savedPoints, [], (raw) => {
+      const parsed = JSON.parse(raw)
+
+      if (!Array.isArray(parsed)) {
+        return []
+      }
+
+      return parsed.flatMap((item): UserSavedPoint[] => {
+        if (
+          typeof item?.id !== 'string' ||
+          typeof item?.name !== 'string' ||
+          !Array.isArray(item?.coordinates) ||
+          item.coordinates.length !== 2 ||
+          typeof item.coordinates[0] !== 'number' ||
+          typeof item.coordinates[1] !== 'number' ||
+          !isUserPointIconKey(item?.icon)
+        ) {
+          return []
+        }
+
+        return [
+          {
+            id: item.id,
+            name: item.name.trim(),
+            icon: item.icon,
+            coordinates: [item.coordinates[0], item.coordinates[1]],
+            districtId: typeof item?.districtId === 'string' ? item.districtId : null,
+            createdAt:
+              typeof item?.createdAt === 'string'
+                ? item.createdAt
+                : new Date().toISOString(),
+          },
+        ]
+      })
     }),
   )
   const [isLoading, setIsLoading] = useState(true)
@@ -293,7 +335,18 @@ export default function App() {
     persistValue(STORAGE_KEYS.transportVisibility, transportVisibility)
   }, [transportVisibility])
 
+  useEffect(() => {
+    persistValue(STORAGE_KEYS.savedPoints, savedPoints)
+  }, [savedPoints])
+
+  function getDistrictIdForCoordinates(coordinates: [number, number]): string | null {
+    return postalData
+      ? findFeatureAtPoint(postalData.features, coordinates)?.properties.id ?? null
+      : null
+  }
+
   function handleDistrictSelect(districtId: string) {
+    setSelectedSavedPointId(null)
     setSelectedDistrictId(districtId)
     setFocusRequest((previous): FocusRequest => ({
       kind: 'district',
@@ -303,6 +356,7 @@ export default function App() {
   }
 
   function handleSubareaSelect(subarea: DistrictSubarea) {
+    setSelectedSavedPointId(null)
     setSelectedDistrictId(subarea.districtId)
 
     if (!subarea.coordinates) {
@@ -327,6 +381,7 @@ export default function App() {
   }
 
   function handleResetView() {
+    setSelectedSavedPointId(null)
     setFocusRequest((previous): FocusRequest => ({
       kind: 'reset',
       nonce: (previous?.nonce ?? 0) + 1,
@@ -337,9 +392,8 @@ export default function App() {
     coordinates: [number, number]
     zoom?: number
   }) {
-    const matchingDistrictId = postalData
-      ? findFeatureAtPoint(postalData.features, payload.coordinates)?.properties.id ?? null
-      : null
+    setSelectedSavedPointId(null)
+    const matchingDistrictId = getDistrictIdForCoordinates(payload.coordinates)
 
     setSelectedDistrictId(matchingDistrictId)
     setFocusRequest((previous): FocusRequest => ({
@@ -387,6 +441,120 @@ export default function App() {
     }))
   }
 
+  function handleSavedPointCreate(payload: {
+    coordinates: [number, number]
+    icon: UserPointIconKey
+    name: string
+  }) {
+    const matchingDistrictId = getDistrictIdForCoordinates(payload.coordinates)
+    const pointId = `saved-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const nextPoint: UserSavedPoint = {
+      id: pointId,
+      name: payload.name.trim(),
+      icon: payload.icon,
+      coordinates: payload.coordinates,
+      districtId: matchingDistrictId,
+      createdAt: new Date().toISOString(),
+    }
+
+    setSavedPoints((current) => [nextPoint, ...current])
+    setSelectedSavedPointId(pointId)
+    setSelectedDistrictId(matchingDistrictId)
+    setFocusRequest((previous): FocusRequest => ({
+      kind: 'saved-point',
+      pointId,
+      coordinates: payload.coordinates,
+      zoom: 16,
+      nonce: (previous?.nonce ?? 0) + 1,
+    }))
+  }
+
+  function handleSavedPointUpdate(
+    pointId: string,
+    payload: {
+      coordinates: [number, number]
+      icon: UserPointIconKey
+      name: string
+    },
+  ) {
+    const matchingDistrictId = getDistrictIdForCoordinates(payload.coordinates)
+
+    setSavedPoints((current) =>
+      current.map((point) =>
+        point.id === pointId
+          ? {
+              ...point,
+              name: payload.name.trim(),
+              icon: payload.icon,
+              coordinates: payload.coordinates,
+              districtId: matchingDistrictId,
+            }
+          : point,
+      ),
+    )
+
+    if (selectedSavedPointId === pointId) {
+      setSelectedDistrictId(matchingDistrictId)
+      setFocusRequest((previous): FocusRequest => ({
+        kind: 'saved-point',
+        pointId,
+        coordinates: payload.coordinates,
+        zoom: 16,
+        nonce: (previous?.nonce ?? 0) + 1,
+      }))
+    }
+  }
+
+  function handleSavedPointSelect(pointId: string) {
+    const savedPoint = savedPoints.find((point) => point.id === pointId)
+
+    if (!savedPoint) {
+      return
+    }
+
+    setSelectedSavedPointId(pointId)
+    setSelectedDistrictId(savedPoint.districtId)
+    setFocusRequest((previous): FocusRequest => ({
+      kind: 'saved-point',
+      pointId,
+      coordinates: savedPoint.coordinates,
+      zoom: 16,
+      nonce: (previous?.nonce ?? 0) + 1,
+    }))
+  }
+
+  function handleSavedPointDelete(pointId: string) {
+    setSavedPoints((current) => current.filter((point) => point.id !== pointId))
+    setSelectedSavedPointId((current) => (current === pointId ? null : current))
+  }
+
+  function handleSavedPointsImport(
+    importedPoints: Array<{
+      coordinates: [number, number]
+      icon: UserPointIconKey
+      name: string
+    }>,
+  ) {
+    const nextPoints: UserSavedPoint[] = importedPoints.map((point, index) => ({
+      id: `saved-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+      name: point.name.trim(),
+      icon: point.icon,
+      coordinates: point.coordinates,
+      districtId: getDistrictIdForCoordinates(point.coordinates),
+      createdAt: new Date().toISOString(),
+    }))
+
+    setSavedPoints(nextPoints)
+    setSelectedSavedPointId(null)
+    setSelectedDistrictId(null)
+  }
+
+  function handleSavedPointsClear() {
+    setSavedPoints([])
+    setSelectedSavedPointId(null)
+    setSelectedDistrictId(null)
+  }
+
   const filteredDistricts = allDistricts.filter((district) => {
     if (!matchesSelectedGrades(district.ratings.overall, selectedGrades)) {
       return false
@@ -413,6 +581,9 @@ export default function App() {
   }
 
   const selectedDistrict = selectedDistrictId ? allDistrictsById[selectedDistrictId] ?? null : null
+  const selectedSavedPoint = selectedSavedPointId
+    ? savedPoints.find((point) => point.id === selectedSavedPointId) ?? null
+    : null
   const selectedDistrictFeature =
     selectedDistrictId && postalData
       ? postalData.features.find((feature) => feature.properties.id === selectedDistrictId) ?? null
@@ -444,9 +615,16 @@ export default function App() {
         onGradeToggle={handleGradeToggle}
         onLifestyleTagToggle={handleLifestyleTagToggle}
         onResetFilters={handleResetFilters}
+        onSavedPointClear={handleSavedPointsClear}
+        onSavedPointDelete={handleSavedPointDelete}
+        onSavedPointImport={handleSavedPointsImport}
+        onSavedPointSelect={handleSavedPointSelect}
+        onSavedPointUpdate={handleSavedPointUpdate}
         onSortModeChange={setSortMode}
         onSubareaSelect={handleSubareaSelect}
         onToggleOpen={() => setIsSidebarOpen(false)}
+        savedPoints={savedPoints}
+        selectedSavedPointId={selectedSavedPointId}
       />
 
       <section className="map-panel">
@@ -457,6 +635,7 @@ export default function App() {
             labelMode={districtLabelMode}
             onCoordinateFocus={handleCoordinateFocus}
             onResetView={handleResetView}
+            onSavedPointDelete={handleSavedPointDelete}
             opacity={overlayOpacity}
             onLabelModeChange={setDistrictLabelMode}
             onOpacityChange={setOverlayOpacity}
@@ -466,6 +645,7 @@ export default function App() {
             selectedDistrict={selectedDistrict}
             selectedDistrictDaftRentLink={selectedDistrictDaftRentLink}
             selectedDistrictGoogleMapsUrl={selectedDistrictGoogleMapsUrl}
+            selectedSavedPoint={selectedSavedPoint}
             showDistrictLabels={showDistrictLabels}
             transportAvailable={Boolean(transportData?.features.length)}
             transportVisibility={transportVisibility}
@@ -477,9 +657,13 @@ export default function App() {
             isLoading={isLoading}
             loadError={loadError}
             overlayOpacity={overlayOpacity}
+            onSavedPointCreate={handleSavedPointCreate}
             selectedDistrictId={selectedDistrictId}
+            selectedSavedPointId={selectedSavedPointId}
             labelMode={districtLabelMode}
+            onSavedPointSelect={handleSavedPointSelect}
             showDistrictLabels={showDistrictLabels}
+            savedPoints={savedPoints}
             transportData={transportData}
             transportVisibility={transportVisibility}
             visibleDistrictIds={visibleDistrictIds}

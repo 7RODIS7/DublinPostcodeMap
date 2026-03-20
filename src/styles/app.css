@@ -305,6 +305,445 @@ button {
   background: rgba(255, 255, 255, 0.48);
 }
 
+.saved-points-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(21, 35, 43, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: var(--shadow-soft);
+}
+
+.saved-points-card__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.saved-points-card__summary,
+.saved-points-card__icon-button,
+.saved-points-card__menu-action,
+.saved-points-list__button,
+.saved-points-list__action-icon,
+.saved-points-editor__icon,
+.saved-points-editor__action {
+  border: none;
+  color: inherit;
+}
+
+.saved-points-card__summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+  padding: 0;
+  background: none;
+  text-align: left;
+}
+
+.saved-points-card__summary strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.saved-points-card__head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.saved-points-card__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.9rem;
+  min-height: 1.9rem;
+  padding: 0 8px;
+  border-radius: 999px;
+  color: var(--accent-strong);
+  background: rgba(29, 156, 121, 0.12);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.saved-points-card__icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.95rem;
+  height: 1.95rem;
+  padding: 0;
+  border: 1px solid rgba(21, 35, 43, 0.08);
+  border-radius: 999px;
+  color: var(--accent-strong);
+  background: rgba(21, 35, 43, 0.04);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.saved-points-card__icon-button svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.saved-points-card__file-input {
+  display: none;
+}
+
+.saved-points-card__menu-shell {
+  position: relative;
+}
+
+.saved-points-card__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: max-content;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid rgba(21, 35, 43, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 251, 246, 0.96);
+  box-shadow: 0 16px 32px rgba(21, 35, 43, 0.14);
+  backdrop-filter: blur(18px);
+}
+
+.saved-points-card__menu-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 2rem;
+  padding: 0 9px;
+  border-radius: 10px;
+  background: rgba(21, 35, 43, 0.04);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-align: left;
+}
+
+.saved-points-card__menu-action--danger {
+  color: #8b3d3d;
+  background: rgba(176, 67, 67, 0.08);
+}
+
+.saved-points-card__popover {
+  padding: 10px 11px;
+  border-radius: 14px;
+  color: var(--text-muted);
+  background: rgba(21, 35, 43, 0.04);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.saved-points-card__notice {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.saved-points-card__notice[data-tone='error'] {
+  color: #9f3737;
+}
+
+.saved-points-card__empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.saved-points-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.saved-points-list__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.saved-points-list__row[data-selected='true'] .saved-points-list__item {
+  border-color: rgba(29, 156, 121, 0.28);
+  background: rgba(29, 156, 121, 0.08);
+}
+
+.saved-points-list__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-width: 0;
+  padding: 4px;
+  border: 1px solid rgba(21, 35, 43, 0.06);
+  border-radius: 14px;
+  background: rgba(21, 35, 43, 0.03);
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.saved-points-list__item:hover {
+  background: rgba(21, 35, 43, 0.05);
+  transform: translateY(-1px);
+}
+
+.saved-points-list__button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 7px;
+  text-align: left;
+  border-radius: 10px;
+  background: none;
+}
+
+.saved-points-list__button--inline {
+  min-height: 2.8rem;
+  justify-content: flex-start;
+}
+
+.saved-points-list__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.saved-points-list__glyph,
+.saved-points-list__glyph svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.saved-points-list__main-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.saved-points-list__name {
+  font-size: 0.84rem;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.saved-points-list__meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: rgba(21, 35, 43, 0.06);
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.saved-points-list__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 4px;
+}
+
+.saved-points-list__action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 12px;
+  color: var(--accent-strong);
+  background: rgba(21, 35, 43, 0.05);
+  text-decoration: none;
+  transition: background 140ms ease, transform 140ms ease;
+}
+
+.saved-points-list__action-icon:hover {
+  background: rgba(21, 35, 43, 0.09);
+  transform: translateY(-1px);
+}
+
+.saved-points-list__action-icon svg {
+  width: 0.92rem;
+  height: 0.92rem;
+}
+
+.saved-points-list__action-icon--danger {
+  color: #7f3e3e;
+  background: rgba(176, 67, 67, 0.08);
+}
+
+.saved-points-list__action-icon--danger:hover {
+  background: rgba(176, 67, 67, 0.14);
+}
+
+.saved-points-list__map-action {
+  align-self: stretch;
+  min-height: 3rem;
+  border-radius: 14px;
+}
+
+.saved-points-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  grid-column: 1 / -1;
+  padding: 11px;
+  border-radius: 14px;
+  background: rgba(21, 35, 43, 0.04);
+}
+
+.saved-points-editor__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.saved-points-editor__field span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.saved-points-editor__field input {
+  width: 100%;
+  padding: 10px 11px;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(21, 35, 43, 0.08);
+  border-radius: 12px;
+  outline: none;
+}
+
+.saved-points-editor__field input:focus {
+  border-color: rgba(29, 156, 121, 0.55);
+  box-shadow: 0 0 0 4px rgba(29, 156, 121, 0.1);
+}
+
+.saved-points-editor__icon-control {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 3rem;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.saved-points-editor__icon-control:focus-within {
+  box-shadow: 0 0 0 4px rgba(29, 156, 121, 0.1);
+}
+
+.saved-points-editor__icon-trigger,
+.saved-points-editor__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid rgba(21, 35, 43, 0.08);
+  border-radius: 999px;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.saved-points-editor__icon-panel {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 8px);
+  z-index: 15;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(21, 35, 43, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 251, 246, 0.96);
+  box-shadow: 0 16px 32px rgba(21, 35, 43, 0.14);
+  backdrop-filter: blur(18px);
+}
+
+.saved-points-editor__icon[data-active='true'] {
+  border-color: rgba(29, 156, 121, 0.34);
+  background: rgba(29, 156, 121, 0.08);
+}
+
+.saved-points-editor__icon-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.saved-points-editor__icon-glyph,
+.saved-points-editor__icon-glyph svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.saved-points-editor__icon-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  color: inherit;
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 700;
+  outline: none;
+}
+
+.saved-points-editor__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.saved-points-editor__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0 12px;
+  border: none;
+  border-radius: 999px;
+  color: var(--accent-strong);
+  background: rgba(21, 35, 43, 0.08);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.saved-points-editor__action--primary {
+  color: #fffdf8;
+  background: rgba(24, 36, 43, 0.92);
+}
+
 .district-card {
   padding: 10px;
   border: 1px solid rgba(21, 35, 43, 0.08);
@@ -687,7 +1126,26 @@ button {
 }
 
 .toolbar-button {
+  position: relative;
   backdrop-filter: blur(18px);
+}
+
+.toolbar-button__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+}
+
+.toolbar-button__icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.toolbar-button__text {
+  white-space: nowrap;
 }
 
 .toolbar-button--glass {
@@ -841,6 +1299,69 @@ button {
 .selection-card__head strong {
   display: block;
   font-size: 1.04rem;
+}
+
+.selection-card__saved-point {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 11px 12px;
+  border-radius: 16px;
+  background: rgba(21, 35, 43, 0.05);
+}
+
+.selection-card__saved-point-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+}
+
+.selection-card__saved-point-glyph,
+.selection-card__saved-point-glyph svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.selection-card__saved-point-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.selection-card__saved-point-copy strong {
+  font-size: 0.9rem;
+}
+
+.selection-card__saved-point-copy small {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.selection-card__saved-point-label {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.selection-card__saved-point-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0 11px;
+  border: none;
+  border-radius: 999px;
+  color: #7f3e3e;
+  background: rgba(176, 67, 67, 0.1);
+  font-size: 0.74rem;
+  font-weight: 800;
 }
 
 .selection-card__tags {
@@ -1582,6 +2103,53 @@ button {
   color: #ffcf9d;
 }
 
+.saved-point-marker-icon {
+  background: none;
+  border: none;
+}
+
+.saved-point-marker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.saved-point-marker__pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 2px solid rgba(24, 36, 43, 0.86);
+  border-radius: 999px;
+  color: var(--saved-point-color);
+  background: var(--saved-point-background);
+  box-shadow: 0 8px 18px rgba(21, 35, 43, 0.18);
+}
+
+.saved-point-marker__pin svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.saved-point-marker__label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: #fffdf8;
+  background: rgba(24, 36, 43, 0.94);
+  box-shadow: 0 10px 22px rgba(21, 35, 43, 0.18);
+  font-size: 0.76rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.saved-point-marker--selected .saved-point-marker__pin {
+  transform: translateY(-1px);
+}
+
 .map-status {
   position: absolute;
   z-index: 620;
@@ -1722,6 +2290,132 @@ button {
   background: rgba(21, 35, 43, 0.14);
 }
 
+.map-context-menu__action--accent {
+  color: #0f4e40;
+  background: rgba(29, 156, 121, 0.16);
+}
+
+.map-context-menu__action--accent:hover {
+  background: rgba(29, 156, 121, 0.24);
+}
+
+.map-context-menu__save-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.map-context-menu__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.map-context-menu__field span {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.map-context-menu__field input {
+  width: 100%;
+  padding: 10px 11px;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(21, 35, 43, 0.08);
+  border-radius: 12px;
+  outline: none;
+}
+
+.map-context-menu__field input:focus {
+  border-color: rgba(29, 156, 121, 0.55);
+  box-shadow: 0 0 0 4px rgba(29, 156, 121, 0.1);
+}
+
+.map-context-menu__icon-control {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 3rem;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(21, 35, 43, 0.04);
+}
+
+.map-context-menu__icon-control:focus-within {
+  box-shadow: 0 0 0 4px rgba(29, 156, 121, 0.1);
+}
+
+.map-context-menu__icon-trigger,
+.map-context-menu__icon-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid rgba(21, 35, 43, 0.08);
+  border-radius: 999px;
+  color: inherit;
+  background: rgba(21, 35, 43, 0.04);
+}
+
+.map-context-menu__icon-panel {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 8px);
+  z-index: 15;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(21, 35, 43, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 251, 246, 0.96);
+  box-shadow: 0 16px 32px rgba(21, 35, 43, 0.14);
+  backdrop-filter: blur(18px);
+}
+
+.map-context-menu__icon-option[data-active='true'] {
+  border-color: rgba(29, 156, 121, 0.34);
+  background: rgba(29, 156, 121, 0.08);
+}
+
+.map-context-menu__icon-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.map-context-menu__icon-swatch svg {
+  width: 0.92rem;
+  height: 0.92rem;
+}
+
+.map-context-menu__icon-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  color: inherit;
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 700;
+  outline: none;
+}
+
+.map-context-menu__error {
+  margin: 0;
+  color: #9f3737;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
 @media (max-width: 1100px) {
   .selection-card {
     min-width: min(100%, 360px);
@@ -1744,16 +2438,18 @@ button {
     max-height: 52vh;
   }
 
-  .map-toolbar__row,
-  .map-toolbar__cluster,
   .selection-card__head,
   .selection-card__topline,
-  .map-toolbar__actions,
   .map-settings__header,
   .map-settings__switch,
   .subarea-list__main {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .map-toolbar__actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
   .map-toolbar__cluster--end {
@@ -1820,6 +2516,55 @@ button {
     top: 12px;
     left: 12px;
     right: 12px;
+  }
+
+  .map-toolbar__row {
+    gap: 8px;
+  }
+
+  .map-toolbar__cluster {
+    gap: 8px;
+  }
+
+  .map-toolbar__actions {
+    gap: 8px;
+  }
+
+  .toolbar-button {
+    min-width: 2.85rem;
+    min-height: 2.85rem;
+    padding: 0;
+  }
+
+  .toolbar-button__text {
+    display: none;
+  }
+
+  .toolbar-button__badge {
+    position: absolute;
+    top: -5px;
+    right: -3px;
+    min-width: 1.3rem;
+    padding: 2px 5px;
+    font-size: 0.58rem;
+  }
+
+  .selection-card__saved-point {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .selection-card__saved-point-delete {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .saved-points-card__menu {
+    right: -2px;
+    min-width: 0;
+  }
+
+  .saved-points-list__row {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .map-status {

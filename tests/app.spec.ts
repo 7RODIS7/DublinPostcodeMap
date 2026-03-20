@@ -325,6 +325,103 @@ test('right click on the map opens a point menu with a Google Maps handoff', asy
   )
 })
 
+test('context menu stays inside the map when save form opens near the bottom edge', async ({
+  page,
+}) => {
+  await page.goto('/')
+
+  const leafletMap = page.locator('.leaflet-container')
+  const mapCanvas = page.getByTestId('map-canvas')
+  const mapBox = await leafletMap.boundingBox()
+  expect(mapBox).not.toBeNull()
+
+  await leafletMap.click({
+    button: 'right',
+    position: {
+      x: Math.max(48, Math.floor((mapBox?.width ?? 0) - 32)),
+      y: Math.max(48, Math.floor((mapBox?.height ?? 0) - 32)),
+    },
+  })
+
+  await expect(page.getByTestId('map-context-menu')).toBeVisible()
+  await page.getByTestId('map-context-save-toggle').click()
+
+  const canvasBox = await mapCanvas.boundingBox()
+  const menuBox = await page.getByTestId('map-context-menu').boundingBox()
+  expect(canvasBox).not.toBeNull()
+  expect(menuBox).not.toBeNull()
+
+  expect(menuBox!.x).toBeGreaterThanOrEqual(canvasBox!.x)
+  expect(menuBox!.y).toBeGreaterThanOrEqual(canvasBox!.y)
+  expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(canvasBox!.x + canvasBox!.width + 1)
+  expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(canvasBox!.y + canvasBox!.height + 1)
+})
+
+test('custom saved points can be added, edited and survive reload', async ({ page }) => {
+  await page.goto('/')
+
+  await page.locator('.leaflet-container').click({
+    button: 'right',
+    position: { x: 300, y: 280 },
+  })
+
+  await page.getByTestId('map-context-save-toggle').click()
+  await page.getByTestId('map-context-save-name').fill('Work base')
+  await page.getByTestId('map-context-save-icon-trigger').click()
+  await page.getByTestId('map-context-save-icon-work').click()
+  await page.getByTestId('map-context-save-submit').click()
+
+  await expect(page.getByTestId('selected-saved-point')).toContainText('Work base')
+  await expect(page.getByTestId('saved-points')).toContainText('Work base')
+
+  const savedPointRow = page.locator('.saved-points-list__row').filter({
+    hasText: 'Work base',
+  })
+  await savedPointRow.getByRole('button', { name: 'Edit Work base' }).click()
+  await page.locator('.saved-points-editor input').fill('Office shortlist')
+  await page.getByTestId(/saved-point-icon-trigger-.*/).click()
+  await page.getByTestId(/saved-point-icon-.*-heart/).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+
+  await expect(page.getByTestId('saved-points')).toContainText('Office shortlist')
+
+  await page.reload()
+
+  await expect(page.getByTestId('saved-points')).toContainText('Office shortlist')
+})
+
+test('saved point deletion asks for confirmation before removing', async ({ page }) => {
+  await page.goto('/')
+
+  await page.locator('.leaflet-container').click({
+    button: 'right',
+    position: { x: 300, y: 280 },
+  })
+
+  await page.getByTestId('map-context-save-toggle').click()
+  await page.getByTestId('map-context-save-name').fill('Delete me')
+  await page.getByTestId('map-context-save-submit').click()
+
+  const savedPointRow = page.locator('.saved-points-list__row').filter({
+    hasText: 'Delete me',
+  })
+
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('Delete "Delete me" from saved points?')
+    await dialog.dismiss()
+  })
+  await savedPointRow.getByRole('button', { name: 'Delete Delete me' }).click()
+  await expect(page.getByTestId('saved-points')).toContainText('Delete me')
+
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('Delete "Delete me" from saved points?')
+    await dialog.accept()
+  })
+  await savedPointRow.getByRole('button', { name: 'Delete Delete me' }).click()
+
+  await expect(page.getByTestId('saved-points')).not.toContainText('Delete me')
+})
+
 test('shared map view links restore the same area and can be copied again', async ({
   page,
 }) => {
@@ -349,7 +446,7 @@ test('Portmarnock is navigated under Dublin 13 rather than K36', async ({ page }
   await page.goto('/')
 
   await page.getByRole('button', { name: 'Expand Dublin 13', exact: true }).click()
-  await page.getByText('Portmarnock').click()
+  await page.getByRole('button', { name: 'Portmarnock Neighborhood' }).click()
 
   await expect(page.getByTestId('selected-district-name')).toHaveText('Dublin 13')
 })

@@ -1,9 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { lifestyleTagLabels } from '../data/districtTags'
 import { getDistrictColor } from '../lib/districtColors'
-import { createSubareaGoogleMapsUrl } from '../lib/googleMaps'
+import { districtMetaById } from '../lib/districtUtils'
+import { createCoordinateGoogleMapsUrl, createSubareaGoogleMapsUrl } from '../lib/googleMaps'
+import {
+  getUserPointIconDefinition,
+  isUserPointIconKey,
+  userPointIconOptions,
+} from '../lib/userPoints'
 import { clampRating, getOverallScore, ratingMetricLabels } from '../lib/districtRatings'
 import { MetricIcon } from './MetricIcon'
+import { UserPointIcon } from './UserPointIcon'
 import type {
   DistrictGrade,
   DistrictMetricKey,
@@ -11,6 +18,7 @@ import type {
   DistrictSortMode,
   DistrictSubarea,
   DistrictWithSubareas,
+  UserSavedPoint,
 } from '../types/districts'
 
 const GRADE_PRESET_VALUES: DistrictGrade[] = ['A', 'B']
@@ -22,15 +30,35 @@ type DistrictSidebarProps = {
   selectedDistrictId: string | null
   selectedGrades: DistrictGrade[]
   selectedLifestyleTags: DistrictLifestyleTag[]
+  selectedSavedPointId: string | null
   sortMode: DistrictSortMode
   onDistrictSelect: (districtId: string) => void
   onGradePresetSelect: (preset: 'all' | 'b-plus') => void
   onGradeToggle: (grade: DistrictGrade) => void
   onLifestyleTagToggle: (tag: DistrictLifestyleTag) => void
   onResetFilters: () => void
+  onSavedPointClear: () => void
+  onSavedPointDelete: (pointId: string) => void
+  onSavedPointImport: (
+    points: Array<{
+      coordinates: [number, number]
+      icon: UserSavedPoint['icon']
+      name: string
+    }>,
+  ) => void
+  onSavedPointSelect: (pointId: string) => void
+  onSavedPointUpdate: (
+    pointId: string,
+    payload: {
+      coordinates: [number, number]
+      icon: UserSavedPoint['icon']
+      name: string
+    },
+  ) => void
   onSortModeChange: (sortMode: DistrictSortMode) => void
   onSubareaSelect: (subarea: DistrictSubarea) => void
   onToggleOpen: () => void
+  savedPoints: UserSavedPoint[]
 }
 
 export function DistrictSidebar({
@@ -40,20 +68,39 @@ export function DistrictSidebar({
   selectedDistrictId,
   selectedGrades,
   selectedLifestyleTags,
+  selectedSavedPointId,
   sortMode,
   onDistrictSelect,
   onGradePresetSelect,
   onGradeToggle,
   onLifestyleTagToggle,
   onResetFilters,
+  onSavedPointClear,
+  onSavedPointDelete,
+  onSavedPointImport,
+  onSavedPointSelect,
+  onSavedPointUpdate,
   onSortModeChange,
   onSubareaSelect,
   onToggleOpen,
+  savedPoints,
 }: DistrictSidebarProps) {
   const [searchTerm, setSearchTerm] = useState('')
+  const [editingPointId, setEditingPointId] = useState<string | null>(null)
+  const [editingPointName, setEditingPointName] = useState('')
+  const [editingPointIcon, setEditingPointIcon] = useState<UserSavedPoint['icon']>('home')
+  const [isEditingPointIconPickerOpen, setIsEditingPointIconPickerOpen] = useState(false)
+  const [isSavedPointsExpanded, setIsSavedPointsExpanded] = useState(() => savedPoints.length > 0)
+  const [isSavedPointsInfoOpen, setIsSavedPointsInfoOpen] = useState(false)
+  const [isSavedPointsMenuOpen, setIsSavedPointsMenuOpen] = useState(false)
+  const [savedPointsNotice, setSavedPointsNotice] = useState<string | null>(null)
+  const [savedPointsNoticeTone, setSavedPointsNoticeTone] = useState<'neutral' | 'error'>(
+    'neutral',
+  )
   const [expandedDistrictIds, setExpandedDistrictIds] = useState<Set<string>>(
     () => new Set(selectedDistrictId ? [selectedDistrictId] : []),
   )
+  const importInputRef = useRef<HTMLInputElement | null>(null)
 
   const normalizedQuery = searchTerm.trim().toLowerCase()
   const visibleDistricts = districts.filter((district) => {
@@ -72,6 +119,59 @@ export function DistrictSidebar({
 
     return matchesDistrict || matchesSubarea
   })
+  const visibleSavedPoints = savedPoints.filter((point) => {
+    if (!normalizedQuery) {
+      return true
+    }
+
+    const districtName = point.districtId ? districtMetaById[point.districtId]?.name ?? '' : ''
+    const iconLabel = getUserPointIconDefinition(point.icon).label
+
+    return (
+      point.name.toLowerCase().includes(normalizedQuery) ||
+      districtName.toLowerCase().includes(normalizedQuery) ||
+      iconLabel.toLowerCase().includes(normalizedQuery)
+    )
+  })
+
+  useEffect(() => {
+    if (!selectedDistrictId) {
+      return
+    }
+
+    setExpandedDistrictIds((current) => {
+      if (current.has(selectedDistrictId)) {
+        return current
+      }
+
+      const next = new Set(current)
+      next.add(selectedDistrictId)
+      return next
+    })
+  }, [selectedDistrictId])
+
+  useEffect(() => {
+    if (!selectedSavedPointId) {
+      return
+    }
+
+    setIsSavedPointsExpanded(true)
+  }, [selectedSavedPointId])
+
+  useEffect(() => {
+    if (!savedPointsNotice) {
+      return
+    }
+
+    const timerId = window.setTimeout(() => {
+      setSavedPointsNotice(null)
+      setSavedPointsNoticeTone('neutral')
+    }, 2600)
+
+    return () => {
+      window.clearTimeout(timerId)
+    }
+  }, [savedPointsNotice])
 
   function toggleExpanded(districtId: string) {
     setExpandedDistrictIds((current) => {
@@ -83,6 +183,164 @@ export function DistrictSidebar({
       }
       return next
     })
+  }
+
+  function startSavedPointEdit(point: UserSavedPoint) {
+    setEditingPointId(point.id)
+    setEditingPointName(point.name)
+    setEditingPointIcon(point.icon)
+    setIsEditingPointIconPickerOpen(false)
+    setIsSavedPointsExpanded(true)
+    setIsSavedPointsMenuOpen(false)
+    setSavedPointsNotice(null)
+  }
+
+  function cancelSavedPointEdit() {
+    setEditingPointId(null)
+    setEditingPointName('')
+    setEditingPointIcon('home')
+    setIsEditingPointIconPickerOpen(false)
+  }
+
+  function handleSavedPointUpdateSubmit(point: UserSavedPoint) {
+    const trimmedName = editingPointName.trim()
+    if (!trimmedName) {
+      setSavedPointsNotice('Add a label before saving changes.')
+      setSavedPointsNoticeTone('error')
+      return
+    }
+
+    onSavedPointUpdate(point.id, {
+      coordinates: point.coordinates,
+      icon: editingPointIcon,
+      name: trimmedName,
+    })
+    cancelSavedPointEdit()
+    setSavedPointsNotice('Saved point updated.')
+    setSavedPointsNoticeTone('neutral')
+  }
+
+  function handleSavedPointDelete(point: UserSavedPoint) {
+    if (!window.confirm(`Delete "${point.name}" from saved points?`)) {
+      return
+    }
+
+    if (editingPointId === point.id) {
+      cancelSavedPointEdit()
+    }
+
+    onSavedPointDelete(point.id)
+    setSavedPointsNotice(`Deleted "${point.name}".`)
+    setSavedPointsNoticeTone('neutral')
+  }
+
+  function handleSavedPointsExport() {
+    if (savedPoints.length === 0) {
+      setSavedPointsNotice('There are no saved points to export yet.')
+      setSavedPointsNoticeTone('error')
+      return
+    }
+
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      points: savedPoints.map((point) => ({
+        name: point.name,
+        icon: point.icon,
+        coordinates: point.coordinates,
+      })),
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json',
+    })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'dublin-map-saved-points.json'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    setSavedPointsNotice('Saved points exported to JSON.')
+    setSavedPointsNoticeTone('neutral')
+    setIsSavedPointsMenuOpen(false)
+  }
+
+  async function handleSavedPointsImportFromFile(
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+
+    if (!file) {
+      return
+    }
+
+    try {
+      const text = await file.text()
+      const parsed = JSON.parse(text)
+      const rawPoints: unknown[] | null = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed?.points)
+          ? parsed.points
+          : null
+
+      if (!rawPoints) {
+        throw new Error('Invalid file structure.')
+      }
+
+      const importedPoints = rawPoints.flatMap((item: unknown): Array<{
+        coordinates: [number, number]
+        icon: UserSavedPoint['icon']
+        name: string
+      }> => {
+        const candidate = item as {
+          coordinates?: unknown
+          icon?: unknown
+          name?: unknown
+        }
+
+        if (
+          typeof candidate.name !== 'string' ||
+          !Array.isArray(candidate.coordinates) ||
+          candidate.coordinates.length !== 2 ||
+          typeof candidate.coordinates[0] !== 'number' ||
+          typeof candidate.coordinates[1] !== 'number' ||
+          !isUserPointIconKey(candidate.icon)
+        ) {
+          return []
+        }
+
+        const trimmedName = candidate.name.trim()
+        if (!trimmedName) {
+          return []
+        }
+
+        return [
+          {
+            name: trimmedName,
+            icon: candidate.icon,
+            coordinates: [candidate.coordinates[0], candidate.coordinates[1]],
+          },
+        ]
+      })
+
+      if (importedPoints.length === 0) {
+        throw new Error('No valid saved points found in the file.')
+      }
+
+      onSavedPointImport(importedPoints)
+      cancelSavedPointEdit()
+      setSavedPointsNotice(`Imported ${importedPoints.length} saved point${importedPoints.length === 1 ? '' : 's'}.`)
+      setSavedPointsNoticeTone('neutral')
+      setIsSavedPointsExpanded(true)
+      setIsSavedPointsMenuOpen(false)
+    } catch (error) {
+      setSavedPointsNotice(
+        error instanceof Error ? error.message : 'Failed to import saved points.',
+      )
+      setSavedPointsNoticeTone('error')
+    }
   }
 
   function getTypeBadgeLabel(zoneType: DistrictWithSubareas['zoneType']) {
@@ -278,11 +536,365 @@ export function DistrictSidebar({
       </header>
 
       <div className="sidebar__list" data-testid="district-sidebar">
-        {visibleDistricts.length === 0 ? (
+        {visibleSavedPoints.length === 0 && visibleDistricts.length === 0 ? (
           <div className="sidebar__empty-state">
-            No postal areas match the current filters.
+            No saved points or postal areas match the current filters.
           </div>
         ) : null}
+
+        <section className="saved-points-card" data-testid="saved-points">
+          <div className="saved-points-card__head">
+            <button
+              type="button"
+              className="saved-points-card__summary"
+              aria-expanded={isSavedPointsExpanded}
+              data-testid="saved-points-toggle"
+              onClick={() => setIsSavedPointsExpanded((current) => !current)}
+            >
+              <strong>Saved points</strong>
+            </button>
+
+            <div className="saved-points-card__head-actions">
+              <span className="saved-points-card__count">{savedPoints.length}</span>
+              <button
+                type="button"
+                className="saved-points-card__icon-button"
+                aria-expanded={isSavedPointsInfoOpen}
+                aria-label="What are saved points?"
+                data-testid="saved-points-info"
+                onClick={() => {
+                  setIsSavedPointsInfoOpen((current) => !current)
+                  setIsSavedPointsMenuOpen(false)
+                }}
+              >
+                ?
+              </button>
+              <div className="saved-points-card__menu-shell">
+                <button
+                  type="button"
+                  className="saved-points-card__icon-button"
+                  aria-expanded={isSavedPointsMenuOpen}
+                  aria-label="Saved points options"
+                  data-testid="saved-points-options"
+                  onClick={() => {
+                    setIsSavedPointsMenuOpen((current) => !current)
+                    setIsSavedPointsInfoOpen(false)
+                  }}
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <circle cx="3" cy="8" r="1.2" fill="currentColor" />
+                    <circle cx="8" cy="8" r="1.2" fill="currentColor" />
+                    <circle cx="13" cy="8" r="1.2" fill="currentColor" />
+                  </svg>
+                </button>
+
+                {isSavedPointsMenuOpen ? (
+                  <div className="saved-points-card__menu" data-testid="saved-points-menu">
+                    <button
+                      type="button"
+                      className="saved-points-card__menu-action"
+                      data-testid="saved-points-export"
+                      onClick={handleSavedPointsExport}
+                    >
+                      Export
+                    </button>
+                    <button
+                      type="button"
+                      className="saved-points-card__menu-action"
+                      data-testid="saved-points-import"
+                      onClick={() => importInputRef.current?.click()}
+                    >
+                      Import
+                    </button>
+                    <button
+                      type="button"
+                      className="saved-points-card__menu-action saved-points-card__menu-action--danger"
+                      data-testid="saved-points-clear"
+                      onClick={() => {
+                        if (savedPoints.length === 0) {
+                          setSavedPointsNotice('There are no saved points to clear.')
+                          setSavedPointsNoticeTone('error')
+                          setIsSavedPointsMenuOpen(false)
+                          return
+                        }
+
+                        if (!window.confirm('Delete all saved points from this browser?')) {
+                          return
+                        }
+
+                        cancelSavedPointEdit()
+                        onSavedPointClear()
+                        setSavedPointsNotice('Saved points cleared.')
+                        setSavedPointsNoticeTone('neutral')
+                        setIsSavedPointsMenuOpen(false)
+                      }}
+                    >
+                      Clear all
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                className="saved-points-card__icon-button"
+                aria-label={isSavedPointsExpanded ? 'Collapse saved points' : 'Expand saved points'}
+                onClick={() => setIsSavedPointsExpanded((current) => !current)}
+              >
+                <svg
+                  viewBox="0 0 16 16"
+                  aria-hidden="true"
+                  style={{
+                    transform: isSavedPointsExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                  }}
+                >
+                  <path
+                    d="m4 6 4 4 4-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.4"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <input
+              ref={importInputRef}
+              accept="application/json"
+              className="saved-points-card__file-input"
+              type="file"
+              onChange={handleSavedPointsImportFromFile}
+            />
+          </div>
+
+          {isSavedPointsInfoOpen ? (
+            <div className="saved-points-card__popover" data-testid="saved-points-help">
+              Right-click the map to save home, office or shortlist spots locally in this browser.
+            </div>
+          ) : null}
+
+          {savedPointsNotice ? (
+            <p className="saved-points-card__notice" data-tone={savedPointsNoticeTone}>
+              {savedPointsNotice}
+            </p>
+          ) : null}
+
+          {isSavedPointsExpanded && savedPoints.length === 0 ? (
+            <p className="saved-points-card__empty">
+              No saved points yet.
+            </p>
+          ) : null}
+
+          {isSavedPointsExpanded && savedPoints.length > 0 && visibleSavedPoints.length > 0 ? (
+            <div className="saved-points-list">
+              {visibleSavedPoints.map((point) => {
+                const icon = getUserPointIconDefinition(point.icon)
+                const district = point.districtId ? districtMetaById[point.districtId] ?? null : null
+                const districtBadge = district?.shortName ?? 'Out'
+                const pointGoogleMapsUrl = createCoordinateGoogleMapsUrl(point.coordinates, 17)
+
+                return (
+                  <div
+                    key={point.id}
+                    className="saved-points-list__row"
+                    data-selected={selectedSavedPointId === point.id}
+                  >
+                    <div className="saved-points-list__item">
+                      <button
+                        type="button"
+                        className="saved-points-list__button saved-points-list__button--inline"
+                        data-testid={`saved-point-button-${point.id}`}
+                        onClick={() => onSavedPointSelect(point.id)}
+                      >
+                        <span
+                          className="saved-points-list__icon"
+                          style={{
+                            backgroundColor: icon.background,
+                            color: icon.color,
+                          }}
+                        >
+                          <UserPointIcon className="saved-points-list__glyph" iconKey={point.icon} />
+                        </span>
+
+                        <span className="saved-points-list__main-inline">
+                          <span className="saved-points-list__name">{point.name}</span>
+                          <span className="saved-points-list__meta">{districtBadge}</span>
+                        </span>
+                      </button>
+
+                      <div className="saved-points-list__actions">
+                        <button
+                          type="button"
+                          className="saved-points-list__action-icon"
+                          aria-label={`Edit ${point.name}`}
+                          data-testid={`saved-point-edit-${point.id}`}
+                          title="Edit"
+                          onClick={() => startSavedPointEdit(point)}
+                        >
+                          <svg viewBox="0 0 16 16" aria-hidden="true">
+                            <path
+                              d="M3 11.8V13h1.2l6.5-6.5-1.2-1.2L3 11.8Zm8.4-7.9 1.2 1.2.7-.7a.85.85 0 0 0 0-1.2l-.1-.1a.85.85 0 0 0-1.2 0l-.6.8Z"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeLinejoin="round"
+                              strokeWidth="1.2"
+                            />
+                          </svg>
+                        </button>
+
+                        <button
+                          type="button"
+                          className="saved-points-list__action-icon saved-points-list__action-icon--danger"
+                          aria-label={`Delete ${point.name}`}
+                          data-testid={`saved-point-delete-${point.id}`}
+                          title="Delete"
+                          onClick={() => handleSavedPointDelete(point)}
+                        >
+                          <svg viewBox="0 0 16 16" aria-hidden="true">
+                            <path
+                              d="M3.8 4.6h8.4M6.2 4.6V3.5c0-.5.4-.9.9-.9h1.8c.5 0 .9.4.9.9v1.1M5 4.6v7.2c0 .6.4 1 1 1h4c.6 0 1-.4 1-1V4.6M6.8 6.4v4.5M9.2 6.4v4.5"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="1.2"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    <a
+                      className="saved-points-list__map-action subarea-list__map-action"
+                      aria-label={`Open ${point.name} in Google Maps`}
+                      data-testid={`saved-point-map-${point.id}`}
+                      data-tooltip="Open in Google Maps"
+                      href={pointGoogleMapsUrl}
+                      rel="noreferrer"
+                      target="_blank"
+                      title="Open in Google Maps"
+                    >
+                      <svg viewBox="0 0 16 16" aria-hidden="true">
+                        <path
+                          d="M8 14c-2.4-2.8-3.8-5.1-3.8-7A3.8 3.8 0 0 1 8 3.2 3.8 3.8 0 0 1 11.8 7c0 1.9-1.4 4.2-3.8 7Z"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeLinejoin="round"
+                          strokeWidth="1.2"
+                        />
+                        <circle
+                          cx="8"
+                          cy="7"
+                          r="1.35"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.2"
+                        />
+                      </svg>
+                    </a>
+
+                    {editingPointId === point.id ? (
+                      <div className="saved-points-editor" data-testid={`saved-point-editor-${point.id}`}>
+                        <div className="saved-points-editor__icon-control">
+                          <button
+                            type="button"
+                            className="saved-points-editor__icon-trigger"
+                            aria-expanded={isEditingPointIconPickerOpen}
+                            aria-label={`Selected icon: ${getUserPointIconDefinition(editingPointIcon).label}`}
+                            data-testid={`saved-point-icon-trigger-${point.id}`}
+                            onClick={() =>
+                              setIsEditingPointIconPickerOpen((current) => !current)
+                            }
+                          >
+                            <span
+                              className="saved-points-editor__icon-swatch"
+                              style={{
+                                backgroundColor: getUserPointIconDefinition(editingPointIcon).background,
+                                color: getUserPointIconDefinition(editingPointIcon).color,
+                              }}
+                            >
+                              <UserPointIcon
+                                className="saved-points-editor__icon-glyph"
+                                iconKey={editingPointIcon}
+                              />
+                            </span>
+                          </button>
+
+                          <input
+                            className="saved-points-editor__icon-input"
+                            data-testid={`saved-point-name-${point.id}`}
+                            placeholder="Saved point label"
+                            type="text"
+                            value={editingPointName}
+                            onChange={(event) => setEditingPointName(event.target.value)}
+                          />
+
+                          {isEditingPointIconPickerOpen ? (
+                            <div className="saved-points-editor__icon-panel">
+                              {userPointIconOptions.map((iconOption) => (
+                                <button
+                                  key={iconOption.key}
+                                  type="button"
+                                  className="saved-points-editor__icon"
+                                  aria-label={`Use ${iconOption.label} icon`}
+                                  data-active={editingPointIcon === iconOption.key}
+                                  data-testid={`saved-point-icon-${point.id}-${iconOption.key}`}
+                                  title={iconOption.label}
+                                  onClick={() => {
+                                    setEditingPointIcon(iconOption.key)
+                                    setIsEditingPointIconPickerOpen(false)
+                                  }}
+                                >
+                                  <span
+                                    className="saved-points-editor__icon-swatch"
+                                    style={{
+                                      backgroundColor: iconOption.background,
+                                      color: iconOption.color,
+                                    }}
+                                  >
+                                    <UserPointIcon
+                                      className="saved-points-editor__icon-glyph"
+                                      iconKey={iconOption.key}
+                                    />
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div className="saved-points-editor__actions">
+                          <button
+                            type="button"
+                            className="saved-points-editor__action saved-points-editor__action--primary"
+                            data-testid={`saved-point-save-${point.id}`}
+                            onClick={() => handleSavedPointUpdateSubmit(point)}
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            className="saved-points-editor__action"
+                            onClick={cancelSavedPointEdit}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          ) : null}
+
+          {isSavedPointsExpanded && savedPoints.length > 0 && visibleSavedPoints.length === 0 ? (
+            <p className="saved-points-card__empty">
+              No saved points match the current search.
+            </p>
+          ) : null}
+        </section>
 
         {visibleDistricts.map((district) => {
           const isExpanded = expandedDistrictIds.has(district.id)

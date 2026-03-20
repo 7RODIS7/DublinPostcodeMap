@@ -82,6 +82,17 @@ export type DistrictSubarea = {
   zoom?: number
 }
 
+export type UserPointIconKey = 'home' | 'work' | 'pin' | 'heart' | 'star'
+
+export type UserSavedPoint = {
+  id: string
+  name: string
+  icon: UserPointIconKey
+  coordinates: [number, number]
+  districtId: string | null
+  createdAt: string
+}
+
 export type DistrictWithSubareas = DistrictMetadata & {
   lifestyleTags: DistrictLifestyleTag[]
   subareas: DistrictSubarea[]
@@ -130,6 +141,13 @@ export type FocusRequest =
     }
   | {
       kind: 'coordinates'
+      coordinates: [number, number]
+      zoom?: number
+      nonce: number
+    }
+  | {
+      kind: 'saved-point'
+      pointId: string
       coordinates: [number, number]
       zoom?: number
       nonce: number

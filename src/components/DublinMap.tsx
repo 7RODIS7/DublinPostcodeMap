@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import type { Layer, Path, PathOptions } from 'leaflet'
 import L from 'leaflet'
 import {
@@ -18,6 +18,7 @@ import { getFeatureFocusBounds, getFeatureLabelPlacement } from '../lib/geo'
 import { createCoordinateGoogleMapsUrl } from '../lib/googleMaps'
 import { createSharedMapViewUrl, parseSharedMapView } from '../lib/mapViewUrl'
 import { clampRating, getOverallScore } from '../lib/districtRatings'
+import { getUserPointIconDefinition } from '../lib/userPoints'
 import type {
   FocusRequest,
   MapLabelMode,
@@ -28,6 +29,8 @@ import type {
   TransportFeatureCollection,
   TransportLayerKey,
   TransportLayerVisibility,
+  UserPointIconKey,
+  UserSavedPoint,
 } from '../types/districts'
 
 const DUBLIN_CENTER: L.LatLngTuple = [53.3498, -6.2603]
@@ -43,7 +46,15 @@ type DublinMapProps = {
   labelMode: MapLabelMode
   loadError: string | null
   overlayOpacity: number
+  onSavedPointCreate: (payload: {
+    coordinates: [number, number]
+    icon: UserPointIconKey
+    name: string
+  }) => void
+  onSavedPointSelect: (pointId: string) => void
   selectedDistrictId: string | null
+  selectedSavedPointId: string | null
+  savedPoints: UserSavedPoint[]
   showDistrictLabels: boolean
   transportData: TransportFeatureCollection | null
   transportVisibility: TransportLayerVisibility
@@ -54,7 +65,6 @@ type DublinMapProps = {
 type MapLabelVariant = 'compact' | 'micro' | 'extended'
 const transportLayerOrder: TransportLayerKey[] = ['rail', 'luas', 'metro', 'bus']
 const CONTEXT_MENU_WIDTH = 228
-const CONTEXT_MENU_HEIGHT = 194
 
 function buildDistrictStyle(
   districtId: string,
@@ -247,6 +257,41 @@ function createDistrictLabelIcon(
   })
 }
 
+function createSavedPointMarkerIcon(
+  point: UserSavedPoint,
+  isSelected: boolean,
+): L.DivIcon {
+  const icon = getUserPointIconDefinition(point.icon)
+  const labelWidth = isSelected ? Math.max(122, point.name.length * 7 + 64) : 40
+  const iconSize: [number, number] = [labelWidth, 44]
+  const iconAnchor: [number, number] = isSelected ? [22, 38] : [20, 38]
+
+  return L.divIcon({
+    className: 'saved-point-marker-icon',
+    html: `
+      <div
+        class="saved-point-marker${isSelected ? ' saved-point-marker--selected' : ''}"
+        style="--saved-point-color: ${icon.color}; --saved-point-background: ${icon.background};"
+        aria-label="${escapeHtml(point.name)}"
+      >
+        <span class="saved-point-marker__pin">${icon.svg}</span>
+        ${isSelected ? `<span class="saved-point-marker__label">${escapeHtml(point.name)}</span>` : ''}
+      </div>
+    `,
+    iconSize,
+    iconAnchor,
+  })
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
 export function DublinMap({
   data,
   focusRequest,
@@ -254,7 +299,11 @@ export function DublinMap({
   labelMode,
   loadError,
   overlayOpacity,
+  onSavedPointCreate,
+  onSavedPointSelect,
   selectedDistrictId,
+  selectedSavedPointId,
+  savedPoints,
   showDistrictLabels,
   transportData,
   transportVisibility,
@@ -268,11 +317,17 @@ export function DublinMap({
     left: number
     top: number
   } | null>(null)
+  const [contextMenuDraftName, setContextMenuDraftName] = useState('')
+  const [contextMenuDraftIcon, setContextMenuDraftIcon] = useState<UserPointIconKey>('home')
+  const [isSavePointFormOpen, setIsSavePointFormOpen] = useState(false)
+  const [isContextIconPickerOpen, setIsContextIconPickerOpen] = useState(false)
+  const [savePointError, setSavePointError] = useState<string | null>(null)
   const [contextMenuCopyState, setContextMenuCopyState] = useState<
     'idle' | 'coordinates' | 'view-link' | 'error'
   >('idle')
   const layerByDistrictId = useRef(new Map<string, Path>())
   const featureByDistrictId = useRef(new Map<string, PostalFeature>())
+  const contextMenuRef = useRef<HTMLDivElement | null>(null)
   const hasAppliedSharedView = useRef(false)
   const interactionState = useRef({
     overlayOpacity,
@@ -312,6 +367,37 @@ export function DublinMap({
     }
   }, [contextMenuCopyState])
 
+  useLayoutEffect(() => {
+    if (!contextMenu || !map || !contextMenuRef.current) {
+      return
+    }
+
+    const mapSize = map.getSize()
+    const menuWidth = contextMenuRef.current.offsetWidth || CONTEXT_MENU_WIDTH
+    const menuHeight = contextMenuRef.current.offsetHeight
+    const maxLeft = Math.max(12, mapSize.x - menuWidth - 12)
+    const maxTop = Math.max(12, mapSize.y - menuHeight - 12)
+
+    setContextMenu((current) => {
+      if (!current) {
+        return current
+      }
+
+      const nextLeft = Math.max(12, Math.min(current.left, maxLeft))
+      const nextTop = Math.max(12, Math.min(current.top, maxTop))
+
+      if (nextLeft === current.left && nextTop === current.top) {
+        return current
+      }
+
+      return {
+        ...current,
+        left: nextLeft,
+        top: nextTop,
+      }
+    })
+  }, [contextMenu, isSavePointFormOpen, isContextIconPickerOpen, map, savePointError])
+
   useEffect(() => {
     if (!map || hasAppliedSharedView.current) {
       return
@@ -349,6 +435,9 @@ export function DublinMap({
     }
 
     setContextMenu(null)
+    setIsSavePointFormOpen(false)
+    setIsContextIconPickerOpen(false)
+    setSavePointError(null)
     setContextMenuCopyState('idle')
 
     if (focusRequest.kind === 'reset') {
@@ -431,15 +520,28 @@ export function DublinMap({
   }) {
     const mapSize = map?.getSize()
     const maxLeft = mapSize ? Math.max(12, mapSize.x - CONTEXT_MENU_WIDTH - 12) : payload.containerPoint.x
-    const maxTop = mapSize ? Math.max(12, mapSize.y - CONTEXT_MENU_HEIGHT - 12) : payload.containerPoint.y
 
     setContextMenu({
       coordinates: payload.coordinates,
       googleMapsUrl: createCoordinateGoogleMapsUrl(payload.coordinates, 17),
       left: Math.max(12, Math.min(payload.containerPoint.x, maxLeft)),
-      top: Math.max(12, Math.min(payload.containerPoint.y, maxTop)),
+      top: Math.max(12, payload.containerPoint.y),
     })
+    setContextMenuDraftName('')
+    setContextMenuDraftIcon('home')
+    setIsSavePointFormOpen(false)
+    setIsContextIconPickerOpen(false)
+    setSavePointError(null)
     setContextMenuCopyState('idle')
+  }
+
+  function handleContextMenuClose() {
+    setContextMenu(null)
+    setContextMenuDraftName('')
+    setContextMenuDraftIcon('home')
+    setIsSavePointFormOpen(false)
+    setIsContextIconPickerOpen(false)
+    setSavePointError(null)
   }
 
   function copyTextWithExecCommand(text: string): boolean {
@@ -505,6 +607,28 @@ export function DublinMap({
     )
 
     await copyTextToClipboard(shareUrl, 'view-link')
+  }
+
+  function handleSavePointSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!contextMenu) {
+      return
+    }
+
+    const trimmedName = contextMenuDraftName.trim()
+    if (!trimmedName) {
+      setSavePointError('Add a short label before saving the point.')
+      return
+    }
+
+    onSavedPointCreate({
+      coordinates: contextMenu.coordinates,
+      icon: contextMenuDraftIcon,
+      name: trimmedName,
+    })
+    setIsContextIconPickerOpen(false)
+    handleContextMenuClose()
   }
 
   const districtLabels = data
@@ -613,7 +737,7 @@ export function DublinMap({
       >
         <MapInstanceBridge onReady={setMap} />
         <MapContextMenuBridge
-          onClose={() => setContextMenu(null)}
+          onClose={handleContextMenuClose}
           onOpen={handleContextMenuOpen}
         />
 
@@ -675,6 +799,21 @@ export function DublinMap({
             ))
           : null}
 
+        <Pane name="saved-points" style={{ zIndex: 540 }}>
+          {savedPoints.map((point) => (
+            <Marker
+              key={point.id}
+              eventHandlers={{
+                click: () => onSavedPointSelect(point.id),
+              }}
+              icon={createSavedPointMarkerIcon(point, point.id === selectedSavedPointId)}
+              keyboard={false}
+              position={point.coordinates}
+              zIndexOffset={point.id === selectedSavedPointId ? 960 : 720}
+            />
+          ))}
+        </Pane>
+
         {focusRequest?.kind === 'subarea' || focusRequest?.kind === 'coordinates' ? (
           <CircleMarker
             center={focusRequest.coordinates}
@@ -706,6 +845,7 @@ export function DublinMap({
 
       {contextMenu ? (
         <div
+          ref={contextMenuRef}
           className="map-context-menu"
           data-testid="map-context-menu"
           style={{
@@ -751,7 +891,110 @@ export function DublinMap({
             >
               Open point in Google Maps
             </a>
+
+            <button
+              type="button"
+              className="map-context-menu__action map-context-menu__action--accent"
+              data-testid="map-context-save-toggle"
+              onClick={() => {
+                setIsSavePointFormOpen((current) => !current)
+                setIsContextIconPickerOpen(false)
+                  setSavePointError(null)
+                }}
+              >
+              {isSavePointFormOpen ? 'Close save form' : 'Save local point'}
+            </button>
           </div>
+
+          {isSavePointFormOpen ? (
+            <form className="map-context-menu__save-form" onSubmit={handleSavePointSubmit}>
+              <div className="map-context-menu__icon-control">
+                <button
+                  type="button"
+                  className="map-context-menu__icon-trigger"
+                  aria-expanded={isContextIconPickerOpen}
+                  aria-label={`Selected icon: ${getUserPointIconDefinition(contextMenuDraftIcon).label}`}
+                  data-testid="map-context-save-icon-trigger"
+                  onClick={() => setIsContextIconPickerOpen((current) => !current)}
+                >
+                  <span
+                    className="map-context-menu__icon-swatch"
+                    style={{
+                      backgroundColor: getUserPointIconDefinition(contextMenuDraftIcon).background,
+                      color: getUserPointIconDefinition(contextMenuDraftIcon).color,
+                    }}
+                    dangerouslySetInnerHTML={{
+                      __html: getUserPointIconDefinition(contextMenuDraftIcon).svg,
+                    }}
+                  />
+                </button>
+
+                <input
+                  className="map-context-menu__icon-input"
+                  id="map-context-save-name"
+                  data-testid="map-context-save-name"
+                  placeholder="New saved point"
+                  type="text"
+                  value={contextMenuDraftName}
+                  onChange={(event) => {
+                    setContextMenuDraftName(event.target.value)
+                    if (savePointError) {
+                      setSavePointError(null)
+                    }
+                  }}
+                />
+
+                {isContextIconPickerOpen ? (
+                  <div className="map-context-menu__icon-panel">
+                    {(['home', 'work', 'pin', 'heart', 'star'] as UserPointIconKey[]).map(
+                      (iconKey) => {
+                        const icon = getUserPointIconDefinition(iconKey)
+
+                        return (
+                          <button
+                            key={iconKey}
+                            type="button"
+                            className="map-context-menu__icon-option"
+                            aria-label={`Use ${icon.label} icon`}
+                            data-active={contextMenuDraftIcon === iconKey}
+                            data-testid={`map-context-save-icon-${iconKey}`}
+                            title={icon.label}
+                            onClick={() => {
+                              setContextMenuDraftIcon(iconKey)
+                              setIsContextIconPickerOpen(false)
+                            }}
+                          >
+                            <span
+                              className="map-context-menu__icon-swatch"
+                              style={{
+                                backgroundColor: icon.background,
+                                color: icon.color,
+                              }}
+                              dangerouslySetInnerHTML={{ __html: icon.svg }}
+                            />
+                          </button>
+                        )
+                      },
+                    )}
+                  </div>
+                ) : null}
+              </div>
+
+              {savePointError ? (
+                <p className="map-context-menu__error" data-testid="map-context-save-error">
+                  {savePointError}
+                </p>
+              ) : null}
+
+              <button
+                type="submit"
+                className="map-context-menu__action"
+                data-testid="map-context-save-submit"
+              >
+                Save point
+              </button>
+            </form>
+          ) : null}
         </div>
       ) : null}
     </div>

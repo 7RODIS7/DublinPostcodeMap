@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { DistrictMetricPills } from './DistrictMetricPills'
+import { UserPointIcon } from './UserPointIcon'
 import { formatCoordinates, parseCoordinateInput } from '../lib/coordinateSearch'
 import {
   ratingMetricDescriptions,
@@ -8,11 +9,14 @@ import {
 } from '../lib/districtRatings'
 import { lifestyleTagDescriptions, lifestyleTagLabels } from '../data/districtTags'
 import type { DistrictDaftRentLink } from '../lib/daft'
+import { createCoordinateGoogleMapsUrl } from '../lib/googleMaps'
+import { getUserPointIconDefinition } from '../lib/userPoints'
 import type {
   DistrictWithSubareas,
   MapLabelMode,
   TransportLayerKey,
   TransportLayerVisibility,
+  UserSavedPoint,
 } from '../types/districts'
 
 type MapControlsProps = {
@@ -27,15 +31,80 @@ type MapControlsProps = {
   onLabelModeChange: (mode: MapLabelMode) => void
   onOpacityChange: (opacity: number) => void
   onResetView: () => void
+  onSavedPointDelete: (pointId: string) => void
   onShowDistrictLabelsChange: (enabled: boolean) => void
   onTransportToggle: (layerKey: TransportLayerKey) => void
   onToggleSidebar: () => void
   selectedDistrict: DistrictWithSubareas | null
   selectedDistrictDaftRentLink: DistrictDaftRentLink | null
   selectedDistrictGoogleMapsUrl: string | null
+  selectedSavedPoint: UserSavedPoint | null
   showDistrictLabels: boolean
   transportAvailable: boolean
   transportVisibility: TransportLayerVisibility
+}
+
+function ToolbarIcon({
+  kind,
+}: {
+  kind: 'menu' | 'selection' | 'coordinates' | 'settings'
+}) {
+  if (kind === 'menu') {
+    return (
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path
+          d="M2.5 4.2h11M2.5 8h11M2.5 11.8h11"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeWidth="1.4"
+        />
+      </svg>
+    )
+  }
+
+  if (kind === 'selection') {
+    return (
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path
+          d="M8 14c-2.4-2.8-3.8-5.1-3.8-7A3.8 3.8 0 0 1 8 3.2 3.8 3.8 0 0 1 11.8 7c0 1.9-1.4 4.2-3.8 7Z"
+          fill="none"
+          stroke="currentColor"
+          strokeLinejoin="round"
+          strokeWidth="1.2"
+        />
+        <circle cx="8" cy="7" r="1.35" fill="none" stroke="currentColor" strokeWidth="1.2" />
+      </svg>
+    )
+  }
+
+  if (kind === 'coordinates') {
+    return (
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path
+          d="M8 2.2v11.6M2.2 8h11.6"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeWidth="1.2"
+        />
+        <circle cx="8" cy="8" r="4.2" fill="none" stroke="currentColor" strokeWidth="1.2" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="m8 1.9 1 .3.7 1.5 1.4.3 1.2-.4.9.9-.4 1.2.7 1.2 1 .7v1.1l-1 .7-.7 1.2.4 1.2-.9.9-1.2-.4-1.4.3-.7 1.5-1 .3-1-.3-.7-1.5-1.4-.3-1.2.4-.9-.9.4-1.2-.7-1.2-1-.7V7.7l1-.7.7-1.2-.4-1.2.9-.9 1.2.4 1.4-.3.7-1.5 1-.3Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.15"
+      />
+      <circle cx="8" cy="8.3" r="1.85" fill="none" stroke="currentColor" strokeWidth="1.15" />
+    </svg>
+  )
 }
 
 export function MapControls({
@@ -47,12 +116,14 @@ export function MapControls({
   onLabelModeChange,
   onOpacityChange,
   onResetView,
+  onSavedPointDelete,
   onShowDistrictLabelsChange,
   onTransportToggle,
   onToggleSidebar,
   selectedDistrict,
   selectedDistrictDaftRentLink,
   selectedDistrictGoogleMapsUrl,
+  selectedSavedPoint,
   showDistrictLabels,
   transportAvailable,
   transportVisibility,
@@ -63,6 +134,12 @@ export function MapControls({
   const [isLegendOpen, setIsLegendOpen] = useState(false)
   const [coordinateQuery, setCoordinateQuery] = useState('')
   const [coordinateError, setCoordinateError] = useState<string | null>(null)
+  const selectedSavedPointIcon = selectedSavedPoint
+    ? getUserPointIconDefinition(selectedSavedPoint.icon)
+    : null
+  const selectedPointGoogleMapsUrl = selectedSavedPoint
+    ? createCoordinateGoogleMapsUrl(selectedSavedPoint.coordinates, 17)
+    : null
 
   useEffect(() => {
     if (!selectedDistrict) {
@@ -94,10 +171,14 @@ export function MapControls({
             <button
               type="button"
               className="toolbar-button toolbar-button--glass"
+              aria-label="Show sidebar"
               data-testid="sidebar-toggle-show"
               onClick={onToggleSidebar}
             >
-              Show menu
+              <span className="toolbar-button__icon">
+                <ToolbarIcon kind="menu" />
+              </span>
+              <span className="toolbar-button__text">Show menu</span>
             </button>
           ) : null}
         </div>
@@ -107,13 +188,17 @@ export function MapControls({
             <button
               type="button"
               className="toolbar-button toolbar-button--dark"
+              aria-label="Toggle selection panel"
               data-active={openPanel === 'selection'}
               data-testid="selection-toggle"
               onClick={() =>
                 setOpenPanel((current) => (current === 'selection' ? null : 'selection'))
               }
             >
-              Selection
+              <span className="toolbar-button__icon">
+                <ToolbarIcon kind="selection" />
+              </span>
+              <span className="toolbar-button__text">Selection</span>
               {selectedDistrict ? (
                 <span className="toolbar-button__badge">{selectedDistrict.shortName}</span>
               ) : null}
@@ -122,25 +207,33 @@ export function MapControls({
             <button
               type="button"
               className="toolbar-button toolbar-button--dark"
+              aria-label="Toggle coordinates panel"
               data-active={openPanel === 'coordinates'}
               data-testid="coordinates-toggle"
               onClick={() =>
                 setOpenPanel((current) => (current === 'coordinates' ? null : 'coordinates'))
               }
             >
-              Coordinates
+              <span className="toolbar-button__icon">
+                <ToolbarIcon kind="coordinates" />
+              </span>
+              <span className="toolbar-button__text">Coordinates</span>
             </button>
 
             <button
               type="button"
               className="toolbar-button toolbar-button--dark"
+              aria-label="Toggle settings panel"
               data-active={openPanel === 'settings'}
               data-testid="settings-toggle"
               onClick={() =>
                 setOpenPanel((current) => (current === 'settings' ? null : 'settings'))
               }
             >
-              Settings
+              <span className="toolbar-button__icon">
+                <ToolbarIcon kind="settings" />
+              </span>
+              <span className="toolbar-button__text">Settings</span>
             </button>
           </div>
 
@@ -149,6 +242,29 @@ export function MapControls({
               <div className="selection-card__topline">
                 <p className="map-toolbar__eyebrow">Selection</p>
                 <div className="selection-card__tools">
+                  {selectedPointGoogleMapsUrl && selectedSavedPoint ? (
+                    <a
+                      className="selection-card__icon-button"
+                      data-testid="selection-saved-point-google-maps"
+                      data-tooltip="Open saved point in Google Maps"
+                      aria-label={`Open ${selectedSavedPoint.name} in Google Maps`}
+                      href={selectedPointGoogleMapsUrl}
+                      rel="noreferrer"
+                      target="_blank"
+                      title={`Open ${selectedSavedPoint.name} in Google Maps`}
+                    >
+                      <svg viewBox="0 0 16 16" aria-hidden="true">
+                        <path
+                          d="M8 14c-2.4-2.8-3.8-5.1-3.8-7A3.8 3.8 0 0 1 8 3.2 3.8 3.8 0 0 1 11.8 7c0 1.9-1.4 4.2-3.8 7Z"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeLinejoin="round"
+                          strokeWidth="1.2"
+                        />
+                        <circle cx="8" cy="7" r="1.35" fill="none" stroke="currentColor" strokeWidth="1.2" />
+                      </svg>
+                    </a>
+                  ) : null}
                   {selectedDistrictDaftRentLink && selectedDistrict ? (
                     <a
                       className="selection-card__icon-button"
@@ -178,7 +294,7 @@ export function MapControls({
                       </svg>
                     </a>
                   ) : null}
-                  {selectedDistrictGoogleMapsUrl && selectedDistrict ? (
+                  {selectedDistrictGoogleMapsUrl && selectedDistrict && !selectedSavedPoint ? (
                     <a
                       className="selection-card__icon-button"
                       data-testid="selection-google-maps"
@@ -213,6 +329,43 @@ export function MapControls({
                   </button>
                 </div>
               </div>
+
+              {selectedSavedPoint && selectedSavedPointIcon ? (
+                <div className="selection-card__saved-point" data-testid="selected-saved-point">
+                  <span
+                    className="selection-card__saved-point-icon"
+                    style={{
+                      backgroundColor: selectedSavedPointIcon.background,
+                      color: selectedSavedPointIcon.color,
+                    }}
+                  >
+                    <UserPointIcon
+                      className="selection-card__saved-point-glyph"
+                      iconKey={selectedSavedPoint.icon}
+                    />
+                  </span>
+
+                  <div className="selection-card__saved-point-copy">
+                    <span className="selection-card__saved-point-label">Saved point</span>
+                    <strong>{selectedSavedPoint.name}</strong>
+                    <small>
+                      {selectedDistrict
+                        ? `${selectedDistrict.name} · ${formatCoordinates(selectedSavedPoint.coordinates, 5)}`
+                        : formatCoordinates(selectedSavedPoint.coordinates, 5)}
+                    </small>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="selection-card__saved-point-delete"
+                    aria-label={`Delete ${selectedSavedPoint.name}`}
+                    data-testid="selected-saved-point-delete"
+                    onClick={() => onSavedPointDelete(selectedSavedPoint.id)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : null}
 
               {selectedDistrict ? (
                 <>
